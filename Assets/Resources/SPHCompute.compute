@@ -1,0 +1,31 @@
+#pragma kernel CSMain
+
+struct Particle
+{
+    float3 position;
+    float3 velocity;
+    float3 currentForce;
+    float density;
+    float pressure;
+};
+
+RWStructuredBuffer<Particle> _ParticleBuffer;
+float _DeltaTime;
+float3 _Gravity = float3(0, -9.81, 0);
+
+[numthreads(64,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    
+    Particle particle = _ParticleBuffer[id.x];
+    particle.velocity += _Gravity * _DeltaTime;
+    particle.position += particle.velocity * _DeltaTime;
+    
+    // add some bouncing shit
+    if (particle.position.y < 0) {
+        particle.position.y = 0;
+        particle.velocity.y = -particle.velocity.y * 0.5; 
+    }
+    
+    _ParticleBuffer[id.x] = particle;
+}

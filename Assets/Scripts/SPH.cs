@@ -32,7 +32,7 @@ public class SPH : MonoBehaviour
     [Header("Rendering")]
     public Mesh particleMesh;
     public Material particleMaterial;
-    
+
     [Header("Compute Shader")]
     public ComputeShader computeShader;
     public Particle[] particles;
@@ -41,9 +41,6 @@ public class SPH : MonoBehaviour
     private GraphicsBuffer _argsBuffer;
     void InitializeParticles()
     {
-        // Initialize the particle array
-        Particle[] particles = new Particle[MAX_PARTICLES];
-
         int numParticlesX = numToSpawn.x;
         int numParticlesY = numToSpawn.y;
         int numParticlesZ = numToSpawn.z;
@@ -93,13 +90,28 @@ public class SPH : MonoBehaviour
 
     }
 
+    void Update()
+    {
+        // Set shader parameters 
+        computeShader.SetBuffer(0, "_ParticleBuffer", _particleBuffer);
+        computeShader.SetFloat("_DeltaTime", Time.deltaTime);
+        computeShader.SetVector("_Gravity", new Vector3(0, -9.81f, 0));
+
+        int threadGroupsX = Mathf.CeilToInt(_particleCount / 64.0f);
+        computeShader.Dispatch(0, threadGroupsX, 1, 1);
+
+    }
+
     void OnDrawGizmos()
     {
         // Draw the particles in the scene view
-        Gizmos.color = Color.white;
-        for (int i = 0; i < _particleCount; i++)
+        if (particles != null)
         {
-            Gizmos.DrawSphere(particles[i].position, particleRadius);
+            Gizmos.color = Color.white;
+            for (int i = 0; i < _particleCount && i < particles.Length; i++)
+            {
+                Gizmos.DrawSphere(particles[i].position, particleRadius);
+            }
         }
 
         Gizmos.color = Color.red;
@@ -109,6 +121,36 @@ public class SPH : MonoBehaviour
         {
             Gizmos.color = Color.cyan;
             Gizmos.DrawWireSphere(spawnBasePosition, 0.1f);
+        }
+    }
+
+    void OnRenderObject()
+    {
+        if (!Application.isPlaying || particles == null || particles.Length == 0 || _argsBuffer == null || _particleBuffer == null)
+            return;
+
+        particleMaterial.SetBuffer("_ParticleBuffer", _particleBuffer);
+        particleMaterial.SetFloat("_ParticleRadius", particleRadius);
+
+        particleMaterial.SetPass(0);
+        Graphics.DrawMeshInstancedIndirect(
+            particleMesh,
+            0,
+            particleMaterial,
+            new Bounds(Vector3.zero, spawnBounds * 50),
+            _argsBuffer
+        );
+    }
+
+    void OnDisable(){
+        if (_particleBuffer != null){
+            _particleBuffer.Release();
+            _particleBuffer = null;
+        }
+
+        if (_argsBuffer != null){
+            _argsBuffer.Release();
+            _argsBuffer = null;
         }
     }
 
