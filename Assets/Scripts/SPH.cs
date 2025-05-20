@@ -27,7 +27,11 @@ public class SPH : MonoBehaviour
     public Vector3Int numToSpawn = new Vector3Int(10, 10, 10);
     public Vector3 spawnBounds = new Vector3(4f, 10f, 3f);
     public Vector3 spawnBasePosition = new Vector3(0f, 0f, 0f);
+
+    public bool useParentPosition = false;
     public float particleRadius = 0.1f;
+
+    public Vector3 gravity = new Vector3(0f, -9.81f, 0f);    
 
     [Header("Rendering")]
     public Mesh particleMesh;
@@ -36,9 +40,11 @@ public class SPH : MonoBehaviour
     [Header("Compute Shader")]
     public ComputeShader computeShader;
     public Particle[] particles;
-
     private ComputeBuffer _particleBuffer;
     private GraphicsBuffer _argsBuffer;
+
+    private float[] gravityBuffer = new float[4 * 4];
+
     void InitializeParticles()
     {
         int numParticlesX = numToSpawn.x;
@@ -71,8 +77,18 @@ public class SPH : MonoBehaviour
     }
     void Start()
     {
-        // Initialize the SPH simulation
+        if (useParentPosition)
+            spawnBasePosition = transform.position;
+        // Initialize the SPH simulation particles
         InitializeParticles();
+
+        /*
+            GraphicsBuffer will handle particle mesh rendering
+            @indexCountPerInstance: number of indices per mesh
+            @instanceCount: number of mesh instances to draw
+            @startIndex: index of the first index in the mesh (index = triple of vertices = triangles)
+            @baseVertexIndex: index of the first vertex in the mesh
+        */
 
         _argsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
         GraphicsBuffer.IndirectDrawIndexedArgs[] args = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
@@ -84,22 +100,70 @@ public class SPH : MonoBehaviour
 
         _argsBuffer.SetData(args);
 
-        // Particle buffer is unchanged
+        
+        /*        
+            ComputeBuffer will handle particle simulation
+            Here, we only set _particleBuffer on CPU once, 
+            later updates directly on GPU by computeShader.
+            @stride: size of each element in the buffer, sizeof(Particle) = 44 bytes
+        */
         _particleBuffer = new ComputeBuffer(_particleCount, 44);
-        _particleBuffer.SetData(particles);
-
+        _particleBuffer.SetData(particles);     
     }
 
     void Update()
     {
-        // Set shader parameters 
+        /*
+            In each frame, we would:
+            1. Bind the variables, kernel index=0 is CSMain
+            2. 64 particles share a thread group, each group has 64 threads
+            3. dispatch work to computeShader, which directly updates on GPU.
+        */
         computeShader.SetBuffer(0, "_ParticleBuffer", _particleBuffer);
         computeShader.SetFloat("_DeltaTime", Time.deltaTime);
-        computeShader.SetVector("_Gravity", new Vector3(0, -9.81f, 0));
+
+        /*
+            This API feeds raw data to the constant buffer, 
+            so the provided data must follow the HLSL constant buffer data layout rules. 
+            This means that the the array elements must be aligned on float4; for example, 
+            float4 data requires no padding, 
+            float3 data needs one float padding for each element, 
+            float2 data needs two floats, and so on.
+            https://cmwdexint.com/2017/12/04/computeshader-setfloats/
+        */
+
+        gravityBuffer[0] = gravity.x;
+        gravityBuffer[4] = gravity.y;
+        gravityBuffer[8] = gravity.z;
+        computeShader.SetFloats("_Gravity", gravityBuffer);
 
         int threadGroupsX = Mathf.CeilToInt(_particleCount / 64.0f);
+        
         computeShader.Dispatch(0, threadGroupsX, 1, 1);
 
+        // Uncomment to debug particle data
+        /*
+            Particle[] debug = new Particle[_particleCount];
+            _particleBuffer.GetData(debug);
+            Debug.Log($"Particle 0 position: {debug[0].position}");
+        */
+
+
+        // Bind ComputeBuffer with the latest particle data (no copy)
+        particleMaterial.SetBuffer("_ParticleBuffer", _particleBuffer);
+        particleMaterial.SetFloat("_ParticleRadius", particleRadius);
+        
+        if (particleMaterial.SetPass(0)) {
+            // Dispatch rendering request, go check Resources/ParticleShader.shader
+            // Instanced: no GameObject for these meshes
+            Graphics.DrawMeshInstancedIndirect(
+                particleMesh,
+                0,
+                particleMaterial,
+                new Bounds(Vector3.zero, spawnBounds * 50),
+                _argsBuffer
+            );
+        }
     }
 
     void OnDrawGizmos()
@@ -124,22 +188,13 @@ public class SPH : MonoBehaviour
         }
     }
 
-    void OnRenderObject()
+    void OnRenderObject() // Called each frame, after all cameras have rendered, after Update
     {
         if (!Application.isPlaying || particles == null || particles.Length == 0 || _argsBuffer == null || _particleBuffer == null)
             return;
-
-        particleMaterial.SetBuffer("_ParticleBuffer", _particleBuffer);
-        particleMaterial.SetFloat("_ParticleRadius", particleRadius);
-
-        particleMaterial.SetPass(0);
-        Graphics.DrawMeshInstancedIndirect(
-            particleMesh,
-            0,
-            particleMaterial,
-            new Bounds(Vector3.zero, spawnBounds * 50),
-            _argsBuffer
-        );
+        // STOP VIBE CODING 
+        // at least look for OnRenderObject() >:(
+        // you render after camera renders, of course you see nothing
     }
 
     void OnDisable(){

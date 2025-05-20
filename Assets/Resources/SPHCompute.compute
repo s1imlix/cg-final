@@ -1,4 +1,6 @@
-#pragma kernel CSMain
+// kernel: a function in computeShader
+// defines CSMain as a kernel (kernel index = 0)
+#pragma kernel CSMain 
 
 struct Particle
 {
@@ -11,21 +13,24 @@ struct Particle
 
 RWStructuredBuffer<Particle> _ParticleBuffer;
 float _DeltaTime;
-float3 _Gravity = float3(0, -9.81, 0);
+float _Gravity[4];
 
 [numthreads(64,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    
     Particle particle = _ParticleBuffer[id.x];
-    particle.velocity += _Gravity * _DeltaTime;
+    particle.velocity.x += _Gravity[0] * _DeltaTime;
+    particle.velocity.y += _Gravity[1] * _DeltaTime;
+    particle.velocity.z += _Gravity[2] * _DeltaTime;
     particle.position += particle.velocity * _DeltaTime;
     
     // add some bouncing shit
+    
     if (particle.position.y < 0) {
         particle.position.y = 0;
         particle.velocity.y = -particle.velocity.y * 0.5; 
     }
+    
     
     _ParticleBuffer[id.x] = particle;
 }

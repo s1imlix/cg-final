@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: New Material
+  m_Name: WaterMaterial
   m_Shader: {fileID: 4800000, guid: b721780bbd6ab4804a809c8e576129ff, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
