@@ -13,15 +13,15 @@ struct Particle
 
 RWStructuredBuffer<Particle> _ParticleBuffer;
 float _DeltaTime;
-float _Gravity[4];
+const float3 _Gravity;
+
+
 
 [numthreads(64,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
     Particle particle = _ParticleBuffer[id.x];
-    particle.velocity.x += _Gravity[0] * _DeltaTime;
-    particle.velocity.y += _Gravity[1] * _DeltaTime;
-    particle.velocity.z += _Gravity[2] * _DeltaTime;
+    particle.velocity += _Gravity * _DeltaTime;
     particle.position += particle.velocity * _DeltaTime;
     
     // add some bouncing shit

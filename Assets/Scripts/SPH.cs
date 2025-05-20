@@ -42,8 +42,8 @@ public class SPH : MonoBehaviour
     public Particle[] particles;
     private ComputeBuffer _particleBuffer;
     private GraphicsBuffer _argsBuffer;
-
-    private float[] gravityBuffer = new float[4 * 4];
+    
+    // private float[] gravityBuffer = new float[4 * 4];
 
     void InitializeParticles()
     {
@@ -122,20 +122,9 @@ public class SPH : MonoBehaviour
         computeShader.SetBuffer(0, "_ParticleBuffer", _particleBuffer);
         computeShader.SetFloat("_DeltaTime", Time.deltaTime);
 
-        /*
-            This API feeds raw data to the constant buffer, 
-            so the provided data must follow the HLSL constant buffer data layout rules. 
-            This means that the the array elements must be aligned on float4; for example, 
-            float4 data requires no padding, 
-            float3 data needs one float padding for each element, 
-            float2 data needs two floats, and so on.
-            https://cmwdexint.com/2017/12/04/computeshader-setfloats/
-        */
+        /* Use const in computeShader seems to fix the issue of not updating gravity */
 
-        gravityBuffer[0] = gravity.x;
-        gravityBuffer[4] = gravity.y;
-        gravityBuffer[8] = gravity.z;
-        computeShader.SetFloats("_Gravity", gravityBuffer);
+        computeShader.SetVector("_Gravity", gravity);
 
         int threadGroupsX = Mathf.CeilToInt(_particleCount / 64.0f);
         
