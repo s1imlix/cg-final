@@ -62,6 +62,7 @@ public class SPH : MonoBehaviour
     const int CSMain = 0;
     const int ExternalGravity = 1;
     const int HandleBoundingBoxCollision = 2;
+    const int SpatialQueryKernel = 3;
     
 
     void InitializeParticles()
