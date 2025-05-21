@@ -55,7 +55,9 @@ public class SPH : MonoBehaviour
 
     const int CSMain = 0;
     const int ExternalGravity = 1;
-    const int HandleBoundingBoxCollision = 2;
+    const int UpdatePositions = 2;
+
+    const int SpatialQueryKernel = 3;
     
 
     void InitializeParticles()
@@ -119,7 +121,7 @@ public class SPH : MonoBehaviour
         */
         _particleBuffer = ComputeHelper.CreateStructBuffer(particles);  
         ComputeHelper.SetBuffer(computeShader, _particleBuffer, "_ParticleBuffer", 
-                                CSMain, ExternalGravity, HandleBoundingBoxCollision);
+                                ExternalGravity, UpdatePositions);
 
         particleRenderer.Init(this);
     }
@@ -129,7 +131,7 @@ public class SPH : MonoBehaviour
         if (isPaused) return;
         float timeStep = deltaTime / iterationPerFrame * timeScale;
 
-        UpdateSettings();
+        UpdateSettings(timeStep);
 
         for (int i = 0; i<iterationPerFrame; i++) {
             Simulate();
@@ -137,19 +139,22 @@ public class SPH : MonoBehaviour
         }
     }
 
-    void UpdateSettings() {
+    void UpdateSettings(float timeStep) {
         // Set global variables in compute shader
-        computeShader.SetFloat("_DeltaTime", Time.deltaTime);
+        computeShader.SetFloat("_DeltaTime", timeStep);
+        computeShader.SetFloat("halfBoxWidth", spawnBoundSize / 2.0f);
+        computeShader.SetInt("numParticles", _particleCount);
         computeShader.SetVector("_Gravity", gravity);
+        computeShader.SetMatrix("worldToLocal", transform.worldToLocalMatrix);
+        computeShader.SetMatrix("localToWorld", transform.localToWorldMatrix);
     }
 
     void Simulate() {
         // Dispatch your work here
-        ComputeHelper.Dispatch(computeShader, _particleCount, CSMain); 
-        Particle[] debug = ComputeHelper.DebugStructBuffer<Particle>(_particleBuffer, _particleCount);
-        Debug.Log($"First particle v: {debug[0].velocity}");
+        ComputeHelper.Dispatch(computeShader, _particleCount, ExternalGravity); 
+        ComputeHelper.Dispatch(computeShader, _particleCount, UpdatePositions);
+        
     }
-
 
     void Update() {
         if (Time.frameCount > 10) {

@@ -1,8 +1,7 @@
 // kernel: a function in computeShader
 #pragma kernel CSMain // 0
 #pragma kernel ExternalGravity // 1
-#pragma kernel HandleBoundingBoxCollision // 2
-
+#pragma kernel UpdatePositions // 2
 struct Particle
 {
     float3 position;
@@ -12,13 +11,27 @@ struct Particle
     float pressure;
 };
 
+struct Entry
+{
+    uint pointIndex;
+    uint cellKey;
+};
+
 RWStructuredBuffer<Particle> _ParticleBuffer;
 const uint numParticles;
 
+StructuredBuffer<Entry> _SpatialLookup;
+StructuredBuffer<uint> _StartIndices;
+RWStructuredBuffer<float2> _Result;
+
+const float _Radius;
+const uint _NumPoints;
+const uint _SpatialLookupLength;
 
 float _DeltaTime;
 const float3 _Gravity;
 
+const float halfBoxWidth;
 const float4x4 localToWorld;
 const float4x4 worldToLocal;
 
@@ -50,11 +63,42 @@ void ExternalGravity(uint3 id : SV_DispatchThreadID)
     _ParticleBuffer[id.x] = particle;
 }
 
-[numthreads(NumThreads, 1, 1)]
 void HandleBoundingBoxCollision(uint3 id : SV_DispatchThreadID) {
-    if (id.x >= numParticles) return;
+
     Particle particle = _ParticleBuffer[id.x];
     
+    // Local scale
     float3 localPos = mul(worldToLocal, float4(particle.position, 1.0)).xyz;
     float3 localVelocity = mul(worldToLocal, float4(particle.velocity, 0.0)).xyz;
+
+    // Check for collision with the bounding box
+    if (localPos.x < -halfBoxWidth || localPos.x > halfBoxWidth) {
+        localVelocity.x = -localVelocity.x * 0.5; // Reflect and dampen
+        localPos.x = clamp(localPos.x, -halfBoxWidth, halfBoxWidth);
+    }
+
+    if (localPos.y < -halfBoxWidth || localPos.y > halfBoxWidth) {
+        localVelocity.y = -localVelocity.y * 0.5; // Reflect and dampen
+        localPos.y = clamp(localPos.y, -halfBoxWidth, halfBoxWidth);
+    }
+
+    if (localPos.z < -halfBoxWidth || localPos.z > halfBoxWidth) {
+        localVelocity.z = -localVelocity.z * 0.5; // Reflect and dampen
+        localPos.z = clamp(localPos.z, -halfBoxWidth, halfBoxWidth);
+    }
+
+    // Transform back to world space
+    particle.position = mul(localToWorld, float4(localPos, 1.0)).xyz;
+    particle.velocity = mul(localToWorld, float4(localVelocity, 0.0)).xyz;
+    _ParticleBuffer[id.x] = particle;
+}
+
+
+[numthreads(NumThreads, 1, 1)]
+void UpdatePositions(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= numParticles) return;
+    Particle particle = _ParticleBuffer[id.x];
+    particle.position += particle.velocity * _DeltaTime;
+    _ParticleBuffer[id.x] = particle;
+    HandleBoundingBoxCollision(id);
 }
