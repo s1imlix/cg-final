@@ -4,6 +4,7 @@ using UnityEngine.InputSystem;
 using CGFinal.Helpers;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
+using System.Linq;
 
 [System.Serializable]
 [StructLayout(LayoutKind.Sequential, Size = 44)]
@@ -52,6 +53,11 @@ public class SPH : MonoBehaviour
     public ComputeShader computeShader;
     public Particle[] particles;
     public ComputeBuffer _particleBuffer;
+
+    public FixedRadiusNeighbourSearch fixedRadiusNeighbourSearch = new FixedRadiusNeighbourSearch();
+    // GPU buffer 用來傳 spatial lookup 結果給 compute shader
+    private ComputeBuffer _spatialLookupBuffer;
+    private ComputeBuffer _startIndicesBuffer;
 
     const int CSMain = 0;
     const int ExternalGravity = 1;
@@ -121,6 +127,10 @@ public class SPH : MonoBehaviour
         ComputeHelper.SetBuffer(computeShader, _particleBuffer, "_ParticleBuffer", 
                                 CSMain, ExternalGravity, HandleBoundingBoxCollision);
 
+        // 預留初始大小（與粒子數同），之後可 Resize
+        _spatialLookupBuffer = new ComputeBuffer(_particleCount, sizeof(uint) * 2); // Entry: uint + uint
+        _startIndicesBuffer = new ComputeBuffer(_particleCount, sizeof(uint));
+
         particleRenderer.Init(this);
     }
 
@@ -143,12 +153,79 @@ public class SPH : MonoBehaviour
         computeShader.SetVector("_Gravity", gravity);
     }
 
+    /*
     void Simulate() {
         // Dispatch your work here
         ComputeHelper.Dispatch(computeShader, _particleCount, CSMain); 
         Particle[] debug = ComputeHelper.DebugStructBuffer<Particle>(_particleBuffer, _particleCount);
         Debug.Log($"First particle v: {debug[0].velocity}");
     }
+    */
+
+    void Simulate()
+    {
+        // GPU 執行第一個 kernel（例如加重力 + 預測位置）
+        ComputeHelper.Dispatch(computeShader, _particleCount, CSMain);
+
+        // Step 1：從 GPU 擷取位置
+        Vector3[] positions3D = ComputeHelper.DebugVector3Buffer(_particleBuffer, _particleCount);
+        Vector2[] positions2D = positions3D.Select(p => new Vector2(p.x, p.y)).ToArray();
+
+        // Step 2：更新 spatial lookup（在 CPU）
+        float radius = particleRenderer.particleRadius;
+        fixedRadiusNeighbourSearch.UpdateSpatialLookup(positions2D, radius);
+
+        // Step 3：把資料傳回 GPU
+        var entries = fixedRadiusNeighbourSearch.SpatialLookup;
+        var startIndices = fixedRadiusNeighbourSearch.StartIndices;
+
+        _spatialLookupBuffer.SetData(entries);
+        _startIndicesBuffer.SetData(startIndices);
+
+        // Step 4：SetBuffer + Dispatch SpatialQueryKernel
+        int spatialQueryKernel = computeShader.FindKernel("SpatialQueryKernel");
+
+        computeShader.SetBuffer(spatialQueryKernel, "_SpatialLookup", _spatialLookupBuffer);
+        computeShader.SetBuffer(spatialQueryKernel, "_StartIndices", _startIndicesBuffer);
+        computeShader.SetFloat("_Radius", radius);
+        computeShader.SetInt("_NumPoints", _particleCount);
+        computeShader.SetInt("_SpatialLookupLength", entries.Length);
+
+        ComputeHelper.Dispatch(computeShader, _particleCount, spatialQueryKernel);
+    }
+
+    /*
+    // predict position (but chatGPT say simulate() already do the job)
+    void SimulationStep(float deltaTime)
+    {
+        // Apply gravity and predict next positions
+        Parallel.For(0, numParticles, i => {
+            velocities[i] += Vector2.down * gravity * deltaTime;
+            predictedPositions[i] = positions[i] + velocities[i] * deltaTime;
+        });
+
+        // Update spatial lookup with predicted positions
+        fixedRadiusNeighbourSearch.UpdateSpatialLookup(predictedPositions, smoothingRadius);
+
+        // Calculate densities
+        Parallel.For(0, numParticles, i => {
+            densities[i] = CalculateDensity(predictedPositions[i]);
+        });
+
+        // Calculate and apply pressure forces
+        Parallel.For(0, numParticles, i => {
+            Vector2 pressureForce = CalculatePressureForce(i);
+            Vector2 pressureAcceleration = pressureForce / densities[i];
+            velocities[i] += pressureAcceleration * deltaTime;
+        });
+
+        // Update positions and resolve collisions
+        Parallel.For(0, numParticles, i => {
+            positions[i] += velocities[i] * deltaTime;
+            ResolveCollisions(ref positions[i], ref velocities[i]);
+        });
+    }
+    */
 
 
     void Update() {
@@ -211,6 +288,8 @@ public class SPH : MonoBehaviour
 
     void OnDestroy(){
         ComputeHelper.Release(_particleBuffer);
+        ComputeHelper.Release(_spatialLookupBuffer);
+        ComputeHelper.Release(_startIndicesBuffer);
     }
 
 }

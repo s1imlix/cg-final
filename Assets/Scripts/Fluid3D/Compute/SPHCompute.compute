@@ -2,6 +2,7 @@
 #pragma kernel CSMain // 0
 #pragma kernel ExternalGravity // 1
 #pragma kernel HandleBoundingBoxCollision // 2
+#pragma kernel SpatialQueryKernel // 3
 
 struct Particle
 {
@@ -14,6 +15,21 @@ struct Particle
 
 RWStructuredBuffer<Particle> _ParticleBuffer;
 const uint numParticles;
+
+struct Entry
+{
+    uint pointIndex;
+    uint cellKey;
+};
+
+StructuredBuffer<Entry> _SpatialLookup;
+StructuredBuffer<uint> _StartIndices;
+StructuredBuffer<float2> _Positions;
+RWStructuredBuffer<float2> _Result;
+
+const float _Radius;
+const uint _NumPoints;
+const uint _SpatialLookupLength;
 
 
 float _DeltaTime;
@@ -57,4 +73,59 @@ void HandleBoundingBoxCollision(uint3 id : SV_DispatchThreadID) {
     
     float3 localPos = mul(worldToLocal, float4(particle.position, 1.0)).xyz;
     float3 localVelocity = mul(worldToLocal, float4(particle.velocity, 0.0)).xyz;
+}
+
+// helper function start
+int2 PositionToCellCoord(float2 point, float radius)
+{
+    int cellX = (int)(point.x / radius);
+    int cellY = (int)(point.y / radius);
+    return int2(cellX, cellY);
+}
+
+uint HashCell(int cellX, int cellY)
+{
+    uint a = (uint)(cellX) * 15823;
+    uint b = (uint)(cellY) * 9737333;
+    return a + b;
+}
+
+uint GetKeyFromHash(uint hash)
+{
+    return hash % _SpatialLookupLength;
+}
+// helper function end
+[numthreads(NumThreads, 1, 1)]
+void SpatialQueryKernel(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _NumPoints) return;
+
+    float2 samplePoint = _Positions[id.x];
+    float sqrRadius = _Radius * _Radius;
+
+    int2 centre = PositionToCellCoord(samplePoint, _Radius);
+
+    float2 force = float2(0, 0);
+
+    for (int ox = -1; ox <= 1; ox++)
+    for (int oy = -1; oy <= 1; oy++)
+    {
+        uint key = GetKeyFromHash(HashCell(centre.x + ox, centre.y + oy));
+        uint start = _StartIndices[key];
+        uint end = (key + 1 < _SpatialLookupLength) ? _StartIndices[key + 1] : _NumPoints;
+
+        for (uint i = start; i < end; i++)
+        {
+            uint neighborIdx = _SpatialLookup[i].pointIndex;
+            float2 neighborPos = _Positions[neighborIdx];
+
+            float d2 = distance(neighborPos, samplePoint);
+            if (d2 < sqrRadius)
+            {
+                // 範例行為：累積方向向量 (idk why chatGPT do this)
+                force += normalize(neighborPos - samplePoint);
+            }
+        }
+    }
+    _Result[id.x] = force;
 }
