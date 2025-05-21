@@ -3,6 +3,7 @@ using UnityEngine.Events;
 using CGFinal.Helpers;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
+using UnityEngine.InputSystem;
 
 [System.Serializable]
 [StructLayout(LayoutKind.Sequential, Size = 44)]
@@ -27,6 +28,7 @@ public class SPH : MonoBehaviour
 
     [Header("Simulation settings")]
     public bool pauseNextFrame = false;
+    private bool isPaused = false;
     public int iterationPerFrame = 1;
     public float timeScale = 1f;
 
@@ -181,7 +183,7 @@ public class SPH : MonoBehaviour
 
     void HandleInput()
     {
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
         {
             pauseNextFrame = true;
         }
