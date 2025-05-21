@@ -24,7 +24,6 @@ struct Entry
 
 StructuredBuffer<Entry> _SpatialLookup;
 StructuredBuffer<uint> _StartIndices;
-StructuredBuffer<float3> _Positions;
 RWStructuredBuffer<float3> _Result;
 
 const float _Radius;
@@ -102,7 +101,7 @@ void SpatialQueryKernel(uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= _NumPoints) return;
 
-    float3 samplePoint = _Positions[id.x];
+    float3 samplePoint = _Particles.position[id.x];
     float sqrRadius = _Radius * _Radius;
 
     int2 centre = PositionToCellCoord(samplePoint, _Radius);
@@ -120,7 +119,7 @@ void SpatialQueryKernel(uint3 id : SV_DispatchThreadID)
         for (uint i = start; i < end; i++)
         {
             uint neighborIdx = _SpatialLookup[i].pointIndex;
-            float3 neighborPos = _Positions[neighborIdx];
+            float3 neighborPos = _Particles.position[neighborIdx];
 
             float d2 = distance(neighborPos, samplePoint);
             if (d2 < sqrRadius)
