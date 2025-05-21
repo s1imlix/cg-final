@@ -2,6 +2,10 @@
 #pragma kernel CSMain // 0
 #pragma kernel ExternalGravity // 1
 #pragma kernel UpdatePositions // 2
+#pragma kernel calcDensity // 3
+#pragma kernel calcPressureForce // 4 
+#pragma kernel calcViscosityForce // 5
+
 struct Particle
 {
     float3 position;
@@ -36,6 +40,34 @@ const float4x4 localToWorld;
 const float4x4 worldToLocal;
 
 static const uint NumThreads = 64; 
+const float mass = 1.0;
+const float radius = 1.0; //to be set
+const float targetDensity = 1000.0; // to be set
+const float pressureMultiplier; // to be set
+const float ngbPressureMultiplier; // to be set
+const float viscosityStrength = 0.1; // to be set
+
+float smoothingKernel(float distance, float h) {
+    if (distance > h) return 0.0;
+    float scale = 15 / (2 * 3.14159 * pow(radius, 5));
+	float v = h - distance;
+	return v * v * scale; //TBD
+}
+
+float smoothingKernelDerivative(float distance, float h) {
+    if (distance > h) return 0.0;
+    float scale = 15 / (pow(radius, 5) * 3.14159);
+	float v = radius - distance;
+	return -v * scale; //TBD
+}
+
+float SmoothingKernelPoly6(float distance, float h) {
+    if (distance > h) return 0.0;
+    float scale = 315 / (64 * PI * pow(abs(radius), 9));
+    float v = radius * radius - distance * distance;
+    return v * v * v * scale; // TBD
+}
+
 
 [numthreads(NumThreads,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
@@ -93,6 +125,83 @@ void HandleBoundingBoxCollision(uint3 id : SV_DispatchThreadID) {
     _ParticleBuffer[id.x] = particle;
 }
 
+[numthreads(NumThreads, 1, 1)]
+void calcDensity(uint3 id : SV_DispatchThreadID) {
+    // based on formula 3
+    if (id.x >= numParticles) return;
+    Particle particle = _ParticleBuffer[id.x];
+    
+    float density = 0.0;
+    for (uint i = 0; i < numParticles; i++) {
+        if (i == id.x) continue; // Skip self
+        Particle otherParticle = _ParticleBuffer[i];
+        float3 diff = particle.position - otherParticle.position;
+        float distance = length(diff);
+
+        if (distance > radius) continue; 
+
+        density += smoothingKernel(distance, radius) * mass;
+    }
+    particle.density = density;
+    _ParticleBuffer[id.x] = particle;
+}
+
+
+
+[numthreads(NumThreads, 1, 1)]
+void calcPressureForce(uint3 id : SV_DispatchThreadID) {
+    // based on formula 10
+    if (id.x >= numParticles) return;
+    Particle particle = _ParticleBuffer[id.x];
+    
+    float pressureForce = 0.0;
+    for (uint i = 0; i < numParticles; i++) {
+        if (i == id.x) continue; // Skip self
+        Particle otherParticle = _ParticleBuffer[i];
+        float3 diff = particle.position - otherParticle.position;
+        float distance = length(diff);
+
+        if (distance > radius) continue;
+
+        float ngbDensity = otherParticle.density;
+        float selfPressure = (particle.density - targetDensity) * pressureMultiplier; // not 100% sure why just scale it but the referred code said so
+        float otherPressure = ngbDensity * ngbPressureMultiplier; 
+        float meanPressure = (selfPressure + otherPressure) / 2.0;
+
+        float3 dir = distance > 0 ? normalize(diff) : float3(0, 1, 0);
+
+        pressureForce += mass * (meanPressure / ngbDensity ) * smoothingKernelDerivative(dir, radius);
+    }
+    float3 acceleration = pressureForce / particle.density;
+    particle.velocity += acceleration * _DeltaTime;
+    _ParticleBuffer[id.x] = particle;
+
+
+}
+
+[numthreads(NumThreads, 1, 1)]
+void calcViscosityForce(uint3 id : SV_DispatchThreadID) {
+    // based on formula 14
+    if (id.x >= numParticles) return;
+    Particle particle = _ParticleBuffer[id.x];
+    
+    float3 viscosityForce = 0;
+    float3 velocity = Velocities[id.x];
+
+    for (uint i = 0; i < numParticles; i++) {
+        if (i == id.x) continue; // Skip self
+        float3 diff = particle.position - otherParticle.position;
+        float distance = length(diff);
+
+        if (distance > radius) continue;
+
+        viscosityForce += (otherParticle.velocity - velocity) * SmoothingKernelPoly6(distance, radius);
+    }
+    particle.velocity += viscosityForce * _DeltaTime * viscosityStrength; //viscosityStrength = mu
+    _ParticleBuffer[id.x] = particle;
+
+}
+
 
 [numthreads(NumThreads, 1, 1)]
 void UpdatePositions(uint3 id : SV_DispatchThreadID) {
@@ -102,3 +211,4 @@ void UpdatePositions(uint3 id : SV_DispatchThreadID) {
     _ParticleBuffer[id.x] = particle;
     HandleBoundingBoxCollision(id);
 }
+
