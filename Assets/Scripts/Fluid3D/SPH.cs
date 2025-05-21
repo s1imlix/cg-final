@@ -41,7 +41,7 @@ public class SPH : MonoBehaviour
     public bool useParentPosition = true;
     public float jitLength = 0.5f;
 
-    public Vector3 initVelocity = new Vector3(0f, 0f, 0f);  
+    public Vector3 initVelocity = new Vector3(0f, 5f, 0f);  
 
     [Header("Rendering")]
 
@@ -94,6 +94,7 @@ public class SPH : MonoBehaviour
                     
                     _particles.Add(new Particle{
                         position = _position,
+                        velocity = initVelocity,
                     });
                 }
             }
@@ -159,6 +160,8 @@ public class SPH : MonoBehaviour
             pauseNextFrame = false;
             isPaused = true;
         }
+
+        HandleInput();
     }
 
     void HandleInput()
