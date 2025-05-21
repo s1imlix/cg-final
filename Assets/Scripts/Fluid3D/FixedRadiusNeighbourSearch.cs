@@ -6,13 +6,13 @@ public class FixedRadiusNeighbourSearch
 {
     private Entry[] spatialLookup;
     private int[] startIndices;
-    private Vector2[] points;
+    private Vector3[] points;
     private float radius;
 
     public Entry[] SpatialLookup => spatialLookup;
     public int[] StartIndices => startIndices;
 
-    public void UpdateSpatialLookup(Vector2[] points, float radius)
+    public void UpdateSpatialLookup(Vector3[] points, float radius)
     {
         this.points = points;
         this.radius = radius;
@@ -22,8 +22,8 @@ public class FixedRadiusNeighbourSearch
 
         Parallel.For(0, points.Length, i =>
         {
-            (int cellX, int cellY) = PositionToCellCoord(points[i], radius);
-            uint cellKey = GetKeyFromHash(HashCell(cellX, cellY));
+            (int x, int y, int z) = PositionToCellCoord(points[i], radius);
+            uint cellKey = GetKeyFromHash(HashCell(x, y, z));
             spatialLookup[i] = new Entry(i, cellKey);
             startIndices[i] = int.MaxValue;
         });
@@ -41,18 +41,20 @@ public class FixedRadiusNeighbourSearch
         });
     }
 
-    private (int, int) PositionToCellCoord(Vector2 point, float radius)
+    private (int, int, int) PositionToCellCoord(Vector3 point, float radius)
     {
         int cellX = (int)(point.x / radius);
         int cellY = (int)(point.y / radius);
-        return (cellX, cellY);
+        int cellZ = (int)(point.z / radius);
+        return (cellX, cellY, cellZ);
     }
 
-    private uint HashCell(int cellX, int cellY)
+    private uint HashCell(int cellX, int cellY, int cellZ)
     {
-        uint a = (uint)cellX * 15823;
-        uint b = (uint)cellY * 9737333;
-        return a + b;
+        uint a = (uint)(cellX) * 73856093;
+        uint b = (uint)(cellY) * 19349663;
+        uint c = (uint)(cellZ) * 83492791;
+        return a ^ b ^ c;
     }
 
     private uint GetKeyFromHash(uint hash)

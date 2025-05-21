@@ -170,11 +170,10 @@ public class SPH : MonoBehaviour
 
         // Step 1：從 GPU 擷取位置
         Vector3[] positions3D = ComputeHelper.DebugVector3Buffer(_particleBuffer, _particleCount);
-        Vector2[] positions2D = positions3D.Select(p => new Vector2(p.x, p.y)).ToArray();
 
         // Step 2：更新 spatial lookup（在 CPU）
         float radius = particleRenderer.particleRadius;
-        fixedRadiusNeighbourSearch.UpdateSpatialLookup(positions2D, radius);
+        fixedRadiusNeighbourSearch.UpdateSpatialLookup(positions3D, radius);
 
         // Step 3：把資料傳回 GPU
         var entries = fixedRadiusNeighbourSearch.SpatialLookup;
