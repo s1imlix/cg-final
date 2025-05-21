@@ -1,7 +1,7 @@
 // kernel: a function in computeShader
-// defines CSMain as a kernel (kernel index = 0)
 #pragma kernel CSMain // 0
 #pragma kernel ExternalGravity // 1
+#pragma kernel HandleBoundingBoxCollision // 2
 
 struct Particle
 {
@@ -57,5 +57,6 @@ void HandleBoundingBoxCollision(uint3 id : SV_DispatchThreadID) {
     
     float3 localPos = mul(worldToLocal, float4(particle.position, 1.0)).xyz;
     float3 localVelocity = mul(worldToLocal, float4(particle.velocity, 0.0)).xyz;
+    
     
 }

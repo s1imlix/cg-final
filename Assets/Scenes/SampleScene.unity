@@ -129,6 +129,7 @@ GameObject:
   m_Component:
   - component: {fileID: 635261036}
   - component: {fileID: 635261035}
+  - component: {fileID: 635261037}
   m_Layer: 0
   m_Name: FluidSimulator
   m_TagString: Untagged
@@ -148,14 +149,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7da0ff73bd2cc9c998612982aabff1e7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  pauseNextFrame: 0
+  iterationPerFrame: 1
+  timeScale: 1
+  gravity: {x: 0, y: -0.62, z: 0}
   numToSpawn: {x: 5, y: 5, z: 5}
-  spawnBounds: {x: 4, y: 10, z: 3}
+  spawnBoundSize: 1
   spawnBasePosition: {x: 0, y: 5, z: 0}
   useParentPosition: 1
-  particleRadius: 0.1
-  gravity: {x: 0, y: -0.62, z: 0}
-  particleMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
-  particleMaterial: {fileID: 2100000, guid: 76ec47c569ad448b3bea6e5b187f6665, type: 2}
+  jitLength: 0.5
+  initVelocity: {x: 0, y: 0, z: 0}
+  particleRenderer: {fileID: 635261037}
+  onSimulationComplete:
+    m_PersistentCalls:
+      m_Calls: []
   computeShader: {fileID: 7200000, guid: e61dc2148a498465b923d42cce2d8176, type: 3}
   particles: []
 --- !u!4 &635261036
@@ -173,6 +180,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &635261037
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 635261034}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 887bc1966b42fc99682782e5d2188010, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  particleMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+  particleMaterial: {fileID: 2100000, guid: 76ec47c569ad448b3bea6e5b187f6665, type: 2}
+  particleRadius: 0.05
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
