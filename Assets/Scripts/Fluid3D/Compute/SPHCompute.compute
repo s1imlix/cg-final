@@ -1,6 +1,7 @@
 // kernel: a function in computeShader
 // defines CSMain as a kernel (kernel index = 0)
-#pragma kernel CSMain 
+#pragma kernel CSMain // 0
+#pragma kernel ExternalGravity // 1
 
 struct Particle
 {
@@ -12,12 +13,18 @@ struct Particle
 };
 
 RWStructuredBuffer<Particle> _ParticleBuffer;
+const uint numParticles;
+
+
 float _DeltaTime;
 const float3 _Gravity;
 
+const float4x4 localToWorld;
+const float4x4 worldToLocal;
 
+static const uint NumThreads = 64; 
 
-[numthreads(64,1,1)]
+[numthreads(NumThreads,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
     Particle particle = _ParticleBuffer[id.x];
@@ -31,6 +38,24 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         particle.velocity.y = -particle.velocity.y * 0.5; 
     }
     
-    
     _ParticleBuffer[id.x] = particle;
+}
+
+[numthreads(NumThreads, 1, 1)]
+void ExternalGravity(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= numParticles) return;
+    Particle particle = _ParticleBuffer[id.x];
+    particle.velocity += _Gravity * _DeltaTime;
+    _ParticleBuffer[id.x] = particle;
+}
+
+[numthreads(NumThreads, 1, 1)]
+void HandleBoundingBoxCollision(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= numParticles) return;
+    Particle particle = _ParticleBuffer[id.x];
+    
+    float3 localPos = mul(worldToLocal, float4(particle.position, 1.0)).xyz;
+    float3 localVelocity = mul(worldToLocal, float4(particle.velocity, 0.0)).xyz;
+    
 }

@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.Events;
+using CGFinal.Helpers;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
 
@@ -23,6 +25,11 @@ public class SPH : MonoBehaviour
         }
     }
 
+    [Header("Simulation settings")]
+    public bool pauseNextFrame = false;
+    public int iterationPerFrame = 1;
+    public float timeScale = 1f;
+
     [Header("Spawner settings")]
     public Vector3Int numToSpawn = new Vector3Int(10, 10, 10);
     public Vector3 spawnBounds = new Vector3(4f, 10f, 3f);
@@ -34,8 +41,10 @@ public class SPH : MonoBehaviour
     public Vector3 gravity = new Vector3(0f, -9.81f, 0f);    
 
     [Header("Rendering")]
+    
     public Mesh particleMesh;
     public Material particleMaterial;
+    public UnityEvent onSimulationComplete;
 
     [Header("Compute Shader")]
     public ComputeShader computeShader;
@@ -43,7 +52,6 @@ public class SPH : MonoBehaviour
     private ComputeBuffer _particleBuffer;
     private GraphicsBuffer _argsBuffer;
     
-    // private float[] gravityBuffer = new float[4 * 4];
 
     void InitializeParticles()
     {
@@ -107,11 +115,11 @@ public class SPH : MonoBehaviour
             later updates directly on GPU by computeShader.
             @stride: size of each element in the buffer, sizeof(Particle) = 44 bytes
         */
-        _particleBuffer = new ComputeBuffer(_particleCount, 44);
+        _particleBuffer = ComputeHelper.CreateStructBuffer(particles);
         _particleBuffer.SetData(particles);     
     }
 
-    void Update()
+    void SimulateFrame(float deltaTime)
     {
         /*
             In each frame, we would:
@@ -119,6 +127,16 @@ public class SPH : MonoBehaviour
             2. 64 particles share a thread group, each group has 64 threads
             3. dispatch work to computeShader, which directly updates on GPU.
         */
+
+        if (isPaused) return;
+        float timeStep = deltaTime / iterationPerFrame * timeScale;
+
+        for (int i = 0; i<iterationPerFrame; i++) {
+            Simulate(timeStep);
+        }
+    }
+
+    void Simulate(float timeStep) {
         computeShader.SetBuffer(0, "_ParticleBuffer", _particleBuffer);
         computeShader.SetFloat("_DeltaTime", Time.deltaTime);
 
@@ -129,14 +147,6 @@ public class SPH : MonoBehaviour
         int threadGroupsX = Mathf.CeilToInt(_particleCount / 64.0f);
         
         computeShader.Dispatch(0, threadGroupsX, 1, 1);
-
-        // Uncomment to debug particle data
-        /*
-            Particle[] debug = new Particle[_particleCount];
-            _particleBuffer.GetData(debug);
-            Debug.Log($"Particle 0 position: {debug[0].position}");
-        */
-
 
         // Bind ComputeBuffer with the latest particle data (no copy)
         particleMaterial.SetBuffer("_ParticleBuffer", _particleBuffer);
@@ -154,6 +164,29 @@ public class SPH : MonoBehaviour
             );
         }
     }
+
+
+    void Update() {
+        if (Time.frameCount > 10) {
+            SimulateFrame(Time.deltaTime);
+        }
+
+        if (pauseNextFrame) {
+            pauseNextFrame = false;
+            isPaused = true;
+        }
+
+        HandleInput();
+    }
+
+    void HandleInput()
+    {
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            pauseNextFrame = true;
+        }
+    }
+
 
     void OnDrawGizmos()
     {
