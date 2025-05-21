@@ -4,6 +4,8 @@
 #pragma kernel calcDensity // 2
 #pragma kernel calcPressureForce // 3
 #pragma kernel calcViscosityForce // 4
+#pragma kernel SpatialQueryKernel // 5
+
 
 #include "./SmoothingKernel.hlsl"
 
@@ -169,3 +171,68 @@ void UpdatePositions(uint3 id : SV_DispatchThreadID) {
     HandleBoundingBoxCollision(id);
 }
 
+    float3 localPos = mul(worldToLocal, float4(particle.position, 1.0)).xyz;
+    float3 localVelocity = mul(worldToLocal, float4(particle.velocity, 0.0)).xyz;
+}
+
+// helper function start
+int3 PositionToCellCoord(float3 point, float radius)
+{
+    int cellX = (int)(point.x / radius);
+    int cellY = (int)(point.y / radius);
+    int cellZ = (int)(point.z / radius);
+    return int3(cellX, cellY, cellZ);
+}
+
+uint HashCell(int cellX, int cellY, int cellZ)
+{
+    uint a = (uint)(cellX) * 73856093;
+    uint b = (uint)(cellY) * 19349663;
+    uint c = (uint)(cellZ) * 83492791;
+    return a ^ b ^ c;
+}
+
+uint GetKeyFromHash(uint hash)
+{
+    return hash % _SpatialLookupLength;
+}
+// helper function end
+[numthreads(NumThreads, 1, 1)]
+void SpatialQueryKernel(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= _NumPoints) return;
+
+    Particle me = _ParticleBuffer[id.x];
+    float3 samplePoint = me.position;
+
+    float sqrRadius = _Radius * _Radius;
+
+    int2 centre = PositionToCellCoord(samplePoint, _Radius);
+
+    float3 force = float3(0, 0, 0);
+
+    for (int ox = -1; ox <= 1; ox++)
+    for (int oy = -1; oy <= 1; oy++)
+    for (int oz = -1; oz <= 1; oz++)
+    {
+        uint key = GetKeyFromHash(HashCell(centre.x + ox, centre.y + oy, centre.z + oz));
+        uint start = _StartIndices[key];
+        uint end = (key + 1 < _SpatialLookupLength) ? _StartIndices[key + 1] : _NumPoints;
+
+        for (uint i = start; i < end; i++)
+        {
+            uint neighborIdx = _SpatialLookup[i].pointIndex;
+            Particle neighbor = _ParticleBuffer[neighborIdx];
+            float3 neighborPos = neighbor.position;
+
+            float d2 = distance(neighborPos, samplePoint);
+            if (d2 < sqrRadius)
+            {
+                // 範例行為：累積方向向量 (idk why chatGPT do this)
+                force += normalize(neighborPos - samplePoint);
+            }
+        }
+    }
+    me.currentForce = force;
+    _ParticleBuffer[id.x] = me;
+}

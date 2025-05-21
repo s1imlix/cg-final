@@ -4,6 +4,7 @@ using UnityEngine.InputSystem;
 using CGFinal.Helpers;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
+using System.Linq;
 
 [System.Serializable]
 [StructLayout(LayoutKind.Sequential, Size = 44)]
@@ -65,6 +66,11 @@ public class SPH : MonoBehaviour
     const int calcDensity = 2;
     const int calcPressureForce = 3;
     const int calcViscosityForce = 4;
+    const int SpatialQueryKernel = 5;
+
+    public FixedRadiusNeighbourSearch fixedRadiusNeighbourSearch = new FixedRadiusNeighbourSearch();
+    private ComputeBuffer _spatialLookupBuffer;
+    private ComputeBuffer _startIndicesBuffer;
     
 
     void InitializeParticles()
@@ -129,7 +135,6 @@ public class SPH : MonoBehaviour
         _particleBuffer = ComputeHelper.CreateStructBuffer(particles);  
         ComputeHelper.SetBuffer(computeShader, _particleBuffer, "_ParticleBuffer", 
                                 ExternalGravity, UpdatePositions, calcDensity, calcPressureForce, calcViscosityForce);
-
         particleRenderer.Init(this);
     }
 
@@ -232,6 +237,8 @@ public class SPH : MonoBehaviour
 
     void OnDestroy(){
         ComputeHelper.Release(_particleBuffer);
+        ComputeHelper.Release(_spatialLookupBuffer);
+        ComputeHelper.Release(_startIndicesBuffer);
     }
 
 }
