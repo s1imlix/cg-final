@@ -49,6 +49,43 @@ const float pressureMultiplier = 1; // to be set
 const float ngbPressureMultiplier = 1; // to be set
 const float viscosityStrength = 0.1; // to be set
 
+static const int3 inRadCellOffset[27] = {
+    int3(-1, -1, -1), int3(0, -1, -1), int3(1, -1, -1),
+    int3(-1, 0, -1), int3(0, 0, -1), int3(1, 0, -1),
+    int3(-1, 1, -1), int3(0, 1, -1), int3(1, 1, -1),
+    int3(-1, -1, 0), int3(0, -1, 0), int3(1, -1, 0),
+    int3(-1, 0, 0), int3(0, 0, 0), int3(1, 0, 0),
+    int3(-1, 1, 0), int3(0, 1, 0), int3(1, 1, 0),
+    int3(-1, -1, 1), int3(0, -1, 1), int3(1, -1, 1),
+    int3(-1, 0, 1), int3(0, 0, 1), int3(1, 0, 1),
+    int3(-1, 1, 1), int3(0, 1, 1), int3(1, 1, 1)
+};
+
+
+// helper function start
+int3 PositionToCellCoord(float3 pos, float radius)
+{
+    int cellX = (int)(pos.x / radius);
+    int cellY = (int)(pos.y / radius);
+    int cellZ = (int)(pos.z / radius);
+    return int3(cellX, cellY, cellZ);
+}
+
+uint HashCell(int cellX, int cellY, int cellZ)
+{
+    uint a = (uint)(cellX) * 73856093;
+    uint b = (uint)(cellY) * 19349663;
+    uint c = (uint)(cellZ) * 83492791;
+    return a ^ b ^ c;
+}
+
+uint GetKeyFromHash(uint hash)
+{
+    return hash % _SpatialLookupLength;
+}
+// helper function end
+
+
 
 [numthreads(NumThreads, 1, 1)]
 void ExternalGravity(uint3 id : SV_DispatchThreadID)
@@ -92,20 +129,33 @@ void HandleBoundingBoxCollision(uint3 id : SV_DispatchThreadID) {
 [numthreads(NumThreads, 1, 1)]
 void calcDensity(uint3 id : SV_DispatchThreadID) {
     // based on formula 3
-    if (id.x >= numParticles) return;
-    Particle particle = _ParticleBuffer[id.x];
-    
-    float density = 0.0;
-    for (uint i = 0; i < numParticles; i++) {
-        if (i == id.x) continue; // Skip self
-        Particle otherParticle = _ParticleBuffer[i];
-        float3 diff = particle.position - otherParticle.position;
-        float distance = length(diff);
+    if (id.x >= _NumPoints) return;
+    Particle me = _ParticleBuffer[id.x];
+    float3 samplePoint = me.position;
 
-        density += smoothingKernel(distance, radius) * mass;
+    float density = 0.0;
+
+    int3 owncell = PositionToCellCoord(samplePoint, radius);
+
+    for (int radCell=0; radCell < 27; radCell++) {
+        int3 ngbCell = owncell + inRadCellOffset[radCell];
+
+        uint key = GetKeyFromHash(HashCell(ngbCell.x, ngbCell.y, ngbCell.z));
+        uint start = _StartIndices[key];
+        uint end = (key + 1 < _SpatialLookupLength) ? _StartIndices[key + 1] : _NumPoints;
+
+        for (uint i = start; i < end; i++) {
+            uint ngbInd = _SpatialLookup[i].pointIndex;
+            if (ngbInd == id.x) continue; // Skip self
+            Particle ngb = _ParticleBuffer[ngbInd];
+            float3 diff = samplePoint - ngb.position;
+            float d = length(diff);
+            if (d > radius) continue;
+            density += SmoothingKernelPoly6(d, radius) * mass;
+        }
     }
-    particle.density = density;
-    _ParticleBuffer[id.x] = particle;
+    me.density = density;
+    _ParticleBuffer[id.x] = me;
 }
 
 
@@ -171,32 +221,8 @@ void UpdatePositions(uint3 id : SV_DispatchThreadID) {
     HandleBoundingBoxCollision(id);
 }
 
-    float3 localPos = mul(worldToLocal, float4(particle.position, 1.0)).xyz;
-    float3 localVelocity = mul(worldToLocal, float4(particle.velocity, 0.0)).xyz;
-}
 
-// helper function start
-int3 PositionToCellCoord(float3 point, float radius)
-{
-    int cellX = (int)(point.x / radius);
-    int cellY = (int)(point.y / radius);
-    int cellZ = (int)(point.z / radius);
-    return int3(cellX, cellY, cellZ);
-}
-
-uint HashCell(int cellX, int cellY, int cellZ)
-{
-    uint a = (uint)(cellX) * 73856093;
-    uint b = (uint)(cellY) * 19349663;
-    uint c = (uint)(cellZ) * 83492791;
-    return a ^ b ^ c;
-}
-
-uint GetKeyFromHash(uint hash)
-{
-    return hash % _SpatialLookupLength;
-}
-// helper function end
+"""
 [numthreads(NumThreads, 1, 1)]
 void SpatialQueryKernel(uint3 id : SV_DispatchThreadID)
 {
@@ -205,9 +231,9 @@ void SpatialQueryKernel(uint3 id : SV_DispatchThreadID)
     Particle me = _ParticleBuffer[id.x];
     float3 samplePoint = me.position;
 
-    float sqrRadius = _Radius * _Radius;
+    float sqrRadius = radius * radius;
 
-    int2 centre = PositionToCellCoord(samplePoint, _Radius);
+    int2 centre = PositionToCellCoord(samplePoint, radius);
 
     float3 force = float3(0, 0, 0);
 
@@ -236,3 +262,4 @@ void SpatialQueryKernel(uint3 id : SV_DispatchThreadID)
     me.currentForce = force;
     _ParticleBuffer[id.x] = me;
 }
+"""
