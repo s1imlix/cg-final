@@ -1,10 +1,11 @@
 // kernel: a function in computeShader
-#pragma kernel CSMain // 0
-#pragma kernel ExternalGravity // 1
-#pragma kernel UpdatePositions // 2
-#pragma kernel calcDensity // 3
-#pragma kernel calcPressureForce // 4 
-#pragma kernel calcViscosityForce // 5
+#pragma kernel ExternalGravity // 0
+#pragma kernel UpdatePositions // 1
+#pragma kernel calcDensity // 2
+#pragma kernel calcPressureForce // 3
+#pragma kernel calcViscosityForce // 4
+
+#include "./SmoothingKernel.hlsl"
 
 struct Particle
 {
@@ -28,7 +29,6 @@ StructuredBuffer<Entry> _SpatialLookup;
 StructuredBuffer<uint> _StartIndices;
 RWStructuredBuffer<float2> _Result;
 
-const float _Radius;
 const uint _NumPoints;
 const uint _SpatialLookupLength;
 
@@ -43,48 +43,10 @@ static const uint NumThreads = 64;
 const float mass = 1.0;
 const float radius = 1.0; //to be set
 const float targetDensity = 1000.0; // to be set
-const float pressureMultiplier; // to be set
-const float ngbPressureMultiplier; // to be set
+const float pressureMultiplier = 1; // to be set
+const float ngbPressureMultiplier = 1; // to be set
 const float viscosityStrength = 0.1; // to be set
 
-float smoothingKernel(float distance, float h) {
-    if (distance > h) return 0.0;
-    float scale = 15 / (2 * 3.14159 * pow(radius, 5));
-	float v = h - distance;
-	return v * v * scale; //TBD
-}
-
-float smoothingKernelDerivative(float distance, float h) {
-    if (distance > h) return 0.0;
-    float scale = 15 / (pow(radius, 5) * 3.14159);
-	float v = radius - distance;
-	return -v * scale; //TBD
-}
-
-float SmoothingKernelPoly6(float distance, float h) {
-    if (distance > h) return 0.0;
-    float scale = 315 / (64 * PI * pow(abs(radius), 9));
-    float v = radius * radius - distance * distance;
-    return v * v * v * scale; // TBD
-}
-
-
-[numthreads(NumThreads,1,1)]
-void CSMain (uint3 id : SV_DispatchThreadID)
-{
-    Particle particle = _ParticleBuffer[id.x];
-    particle.velocity += _Gravity * _DeltaTime;
-    particle.position += particle.velocity * _DeltaTime;
-    
-    // add some bouncing shit
-    
-    if (particle.position.y < 0) {
-        particle.position.y = 0;
-        particle.velocity.y = -particle.velocity.y * 0.5; 
-    }
-    
-    _ParticleBuffer[id.x] = particle;
-}
 
 [numthreads(NumThreads, 1, 1)]
 void ExternalGravity(uint3 id : SV_DispatchThreadID)
@@ -138,8 +100,6 @@ void calcDensity(uint3 id : SV_DispatchThreadID) {
         float3 diff = particle.position - otherParticle.position;
         float distance = length(diff);
 
-        if (distance > radius) continue; 
-
         density += smoothingKernel(distance, radius) * mass;
     }
     particle.density = density;
@@ -154,29 +114,26 @@ void calcPressureForce(uint3 id : SV_DispatchThreadID) {
     if (id.x >= numParticles) return;
     Particle particle = _ParticleBuffer[id.x];
     
-    float pressureForce = 0.0;
+    float3 pressureForce = 0.0;
     for (uint i = 0; i < numParticles; i++) {
         if (i == id.x) continue; // Skip self
         Particle otherParticle = _ParticleBuffer[i];
         float3 diff = particle.position - otherParticle.position;
         float distance = length(diff);
 
-        if (distance > radius) continue;
-
-        float ngbDensity = otherParticle.density;
-        float selfPressure = (particle.density - targetDensity) * pressureMultiplier; // not 100% sure why just scale it but the referred code said so
+        float ngbDensity = max(otherParticle.density, 0.001f);
+        float selfPressure = (particle.density - targetDensity) * pressureMultiplier; 
         float otherPressure = ngbDensity * ngbPressureMultiplier; 
-        float meanPressure = (selfPressure + otherPressure) / 2.0;
+        float meanPressure = (selfPressure + otherPressure) / (2.0 * ngbDensity);
 
         float3 dir = distance > 0 ? normalize(diff) : float3(0, 1, 0);
 
-        pressureForce += mass * (meanPressure / ngbDensity ) * smoothingKernelDerivative(dir, radius);
+        pressureForce += dir * mass * meanPressure * smoothingKernelDerivative(distance, radius); // eq. 10
     }
-    float3 acceleration = pressureForce / particle.density;
+
+    float3 acceleration = pressureForce / max(particle.density, 0.001f); // eq. 8
     particle.velocity += acceleration * _DeltaTime;
     _ParticleBuffer[id.x] = particle;
-
-
 }
 
 [numthreads(NumThreads, 1, 1)]
@@ -186,10 +143,11 @@ void calcViscosityForce(uint3 id : SV_DispatchThreadID) {
     Particle particle = _ParticleBuffer[id.x];
     
     float3 viscosityForce = 0;
-    float3 velocity = Velocities[id.x];
+    float3 velocity = particle.velocity;
 
     for (uint i = 0; i < numParticles; i++) {
         if (i == id.x) continue; // Skip self
+        Particle otherParticle = _ParticleBuffer[i];
         float3 diff = particle.position - otherParticle.position;
         float distance = length(diff);
 
@@ -199,7 +157,6 @@ void calcViscosityForce(uint3 id : SV_DispatchThreadID) {
     }
     particle.velocity += viscosityForce * _DeltaTime * viscosityStrength; //viscosityStrength = mu
     _ParticleBuffer[id.x] = particle;
-
 }
 
 

@@ -19,7 +19,7 @@ public struct Particle
 public class SPH : MonoBehaviour
 {
     [Header("Constants")]
-    private const int MAX_PARTICLES = 1000;
+    public int MAX_PARTICLES = 100000;
     public int _particleCount {
         get {
             return Mathf.Min(numToSpawn.x * numToSpawn.y * numToSpawn.z, MAX_PARTICLES);
@@ -32,7 +32,13 @@ public class SPH : MonoBehaviour
     public int iterationPerFrame = 1;
     public float timeScale = 1f;
 
-    public Vector3 gravity = new Vector3(0f, -9.81f, 0f);   
+    public Vector3 gravity = new Vector3(0f, -9.81f, 0f); 
+    public float targetDensity = 1000f;  
+    public float pressureMultiplier = 0.1f;
+    public float ngbPressureMultiplier = 0.1f;
+
+    public float particleMass = 1f;
+    public float particleRadius = 0.1f; // radius of the particle
 
     [Header("Spawner settings")]
     public Vector3Int numToSpawn = new Vector3Int(10, 10, 10);
@@ -53,11 +59,12 @@ public class SPH : MonoBehaviour
     public Particle[] particles;
     public ComputeBuffer _particleBuffer;
 
-    const int CSMain = 0;
-    const int ExternalGravity = 1;
-    const int UpdatePositions = 2;
+    const int ExternalGravity = 0;
+    const int UpdatePositions = 1;
 
-    const int SpatialQueryKernel = 3;
+    const int calcDensity = 2;
+    const int calcPressureForce = 3;
+    const int calcViscosityForce = 4;
     
 
     void InitializeParticles()
@@ -121,7 +128,7 @@ public class SPH : MonoBehaviour
         */
         _particleBuffer = ComputeHelper.CreateStructBuffer(particles);  
         ComputeHelper.SetBuffer(computeShader, _particleBuffer, "_ParticleBuffer", 
-                                ExternalGravity, UpdatePositions);
+                                ExternalGravity, UpdatePositions, calcDensity, calcPressureForce, calcViscosityForce);
 
         particleRenderer.Init(this);
     }
@@ -143,6 +150,11 @@ public class SPH : MonoBehaviour
         // Set global variables in compute shader
         computeShader.SetFloat("_DeltaTime", timeStep);
         computeShader.SetFloat("halfBoxWidth", spawnBoundSize / 2.0f);
+        computeShader.SetFloat("targetDensity", targetDensity);
+        computeShader.SetFloat("pressureMultiplier", pressureMultiplier);
+        computeShader.SetFloat("ngbPressureMultiplier", ngbPressureMultiplier);
+        computeShader.SetFloat("mass", particleMass);
+        computeShader.SetFloat("radius", particleRadius);
         computeShader.SetInt("numParticles", _particleCount);
         computeShader.SetVector("_Gravity", gravity);
         computeShader.SetMatrix("worldToLocal", transform.worldToLocalMatrix);
@@ -151,9 +163,13 @@ public class SPH : MonoBehaviour
 
     void Simulate() {
         // Dispatch your work here
+        Particle[] _particles = ComputeHelper.DebugStructBuffer<Particle>(_particleBuffer, 1);
+        Debug.Log($"Particle velocity: {_particles[0].velocity}, density: {_particles[0].density}, pressure: {_particles[0].pressure}");
         ComputeHelper.Dispatch(computeShader, _particleCount, ExternalGravity); 
+        ComputeHelper.Dispatch(computeShader, _particleCount, calcDensity);
+        ComputeHelper.Dispatch(computeShader, _particleCount, calcPressureForce);
+        ComputeHelper.Dispatch(computeShader, _particleCount, calcViscosityForce);
         ComputeHelper.Dispatch(computeShader, _particleCount, UpdatePositions);
-        
     }
 
     void Update() {

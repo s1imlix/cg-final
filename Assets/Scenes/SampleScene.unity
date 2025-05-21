@@ -149,12 +149,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7da0ff73bd2cc9c998612982aabff1e7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  pauseNextFrame: 0
+  pauseNextFrame: 1
   iterationPerFrame: 1
   timeScale: 1
   gravity: {x: 0, y: -0.62, z: 0}
-  numToSpawn: {x: 5, y: 5, z: 5}
-  spawnBoundSize: 1
+  targetDensity: 1000
+  pressureMultiplier: 0.1
+  ngbPressureMultiplier: 0.1
+  particleMass: 1
+  particleRadius: 0.1
+  numToSpawn: {x: 100, y: 100, z: 100}
+  spawnBoundSize: 10
   spawnBasePosition: {x: 0, y: 5, z: 0}
   useParentPosition: 1
   jitLength: 0.5
