@@ -4,35 +4,27 @@
 #pragma kernel calcDensity // 2
 #pragma kernel calcPressureForce // 3
 #pragma kernel calcViscosityForce // 4
-#pragma kernel SpatialQueryKernel // 5
+#pragma kernel UpdateSpatialHash // 5
 
 
 #include "./SmoothingKernel.hlsl"
+#include "./SpatialHash.hlsl"
 
 struct Particle
 {
     float3 position;
     float3 velocity;
-    float3 currentForce;
+    float3 predictPosition;
     float density;
-    float pressure;
+    float nearDensity;
 };
 
-struct Entry
-{
-    uint pointIndex;
-    uint cellKey;
-};
 
 RWStructuredBuffer<Particle> _ParticleBuffer;
 const uint numParticles;
 
-StructuredBuffer<Entry> _SpatialLookup;
-StructuredBuffer<uint> _StartIndices;
-RWStructuredBuffer<float2> _Result;
-
-const uint _NumPoints;
-const uint _SpatialLookupLength;
+RWStructuredBuffer<uint3> _SpatialLookupBuffer;
+RWStructuredBuffer<uint> _startIndicesBuffer;
 
 float _DeltaTime;
 const float3 _Gravity;
@@ -43,11 +35,13 @@ const float4x4 worldToLocal;
 
 static const uint NumThreads = 64; 
 const float mass = 1.0;
-const float radius = 1.0; //to be set
-const float targetDensity = 1000.0; // to be set
-const float pressureMultiplier = 1; // to be set
-const float ngbPressureMultiplier = 1; // to be set
-const float viscosityStrength = 0.1; // to be set
+const float radius = 1.0; 
+const float squaredRadius;
+const float targetDensity = 1000.0; 
+const float pressureMultiplier = 1; 
+const float ngbPressureMultiplier = 1; 
+const float viscosityStrength = 0.1; 
+const float collisionDamping = 0.5; 
 
 
 [numthreads(NumThreads, 1, 1)]
@@ -56,6 +50,9 @@ void ExternalGravity(uint3 id : SV_DispatchThreadID)
     if (id.x >= numParticles) return;
     Particle particle = _ParticleBuffer[id.x];
     particle.velocity += _Gravity * _DeltaTime;
+
+    // We predict here for spatial update
+    particle.predictPosition = particle.position + particle.velocity * _DeltaTime;
     _ParticleBuffer[id.x] = particle;
 }
 
@@ -69,17 +66,17 @@ void HandleBoundingBoxCollision(uint3 id : SV_DispatchThreadID) {
 
     // Check for collision with the bounding box
     if (localPos.x < -halfBoxWidth || localPos.x > halfBoxWidth) {
-        localVelocity.x = -localVelocity.x * 0.5; // Reflect and dampen
+        localVelocity.x = -localVelocity.x * collisionDamping; 
         localPos.x = clamp(localPos.x, -halfBoxWidth, halfBoxWidth);
     }
 
     if (localPos.y < -halfBoxWidth || localPos.y > halfBoxWidth) {
-        localVelocity.y = -localVelocity.y * 0.5; // Reflect and dampen
+        localVelocity.y = -localVelocity.y * collisionDamping;
         localPos.y = clamp(localPos.y, -halfBoxWidth, halfBoxWidth);
     }
 
     if (localPos.z < -halfBoxWidth || localPos.z > halfBoxWidth) {
-        localVelocity.z = -localVelocity.z * 0.5; // Reflect and dampen
+        localVelocity.z = -localVelocity.z * collisionDamping;
         localPos.z = clamp(localPos.z, -halfBoxWidth, halfBoxWidth);
     }
 
@@ -94,17 +91,33 @@ void calcDensity(uint3 id : SV_DispatchThreadID) {
     // based on formula 3
     if (id.x >= numParticles) return;
     Particle particle = _ParticleBuffer[id.x];
-    
-    float density = 0.0;
-    for (uint i = 0; i < numParticles; i++) {
-        if (i == id.x) continue; // Skip self
-        Particle otherParticle = _ParticleBuffer[i];
-        float3 diff = particle.position - otherParticle.position;
-        float distance = length(diff);
+    int3 centerCell = PositionToCell3D(particle.predictPosition, radius);
 
-        density += smoothingKernel(distance, radius) * mass;
+    float density = 0.0;
+    float nearDensity = 0.0;
+
+    for (int i = 0; i<27; i++) {
+        uint cellHash = HashCell3D(centerCell + inRadCellOffset[i]);
+        uint cellKey = KeyFromHash(cellHash, numParticles);
+        uint currIndex = _startIndicesBuffer[cellKey]; 
+        while (currIndex < numParticles) {
+            uint3 currParticleLookup = _SpatialLookupBuffer[currIndex++];
+            if (currParticleLookup[2] != cellKey) break; 
+            if (currParticleLookup[1] != cellHash) continue; 
+            
+            uint neighborIndex = currParticleLookup[0];
+            if (neighborIndex == id.x) continue; 
+            Particle otherParticle = _ParticleBuffer[neighborIndex];
+            float3 diff = particle.predictPosition - otherParticle.predictPosition;
+            if (dot(diff, diff) > squaredRadius) continue;
+
+            float distance = length(diff);
+            density += SpikyKernelPow2(distance, radius);
+            nearDensity += SpikyKernelPow3(distance, radius);
+        }
     }
     particle.density = density;
+    particle.nearDensity = nearDensity;
     _ParticleBuffer[id.x] = particle;
 }
 
@@ -112,28 +125,50 @@ void calcDensity(uint3 id : SV_DispatchThreadID) {
 
 [numthreads(NumThreads, 1, 1)]
 void calcPressureForce(uint3 id : SV_DispatchThreadID) {
-    // based on formula 10
+    // based on formula 10 + Near-density
+    // http://www.ligum.umontreal.ca/Clavet-2005-PVFS/pvfs.pdf
     if (id.x >= numParticles) return;
     Particle particle = _ParticleBuffer[id.x];
-    
+    float density = particle.density;
+    float nearDensity = particle.nearDensity;
+    float pressure = (density - targetDensity) * pressureMultiplier; 
+    float nearPressure = nearDensity * ngbPressureMultiplier;
+
     float3 pressureForce = 0.0;
-    for (uint i = 0; i < numParticles; i++) {
-        if (i == id.x) continue; // Skip self
-        Particle otherParticle = _ParticleBuffer[i];
-        float3 diff = particle.position - otherParticle.position;
-        float distance = length(diff);
 
-        float ngbDensity = max(otherParticle.density, 0.001f);
-        float selfPressure = (particle.density - targetDensity) * pressureMultiplier; 
-        float otherPressure = ngbDensity * ngbPressureMultiplier; 
-        float meanPressure = (selfPressure + otherPressure) / (2.0 * ngbDensity);
+    int3 centerCell = PositionToCell3D(particle.predictPosition, radius);
+    for (int i = 0; i<27; i++) {
+        uint cellHash = HashCell3D(centerCell + inRadCellOffset[i]);
+        uint cellKey = KeyFromHash(cellHash, numParticles);
+        uint currIndex = _startIndicesBuffer[cellKey]; 
+        while (currIndex < numParticles) {
+            uint3 currParticleLookup = _SpatialLookupBuffer[currIndex++];
+            if (currParticleLookup[2] != cellKey) break; 
+            if (currParticleLookup[1] != cellHash) continue; 
+            
+            uint neighborIndex = currParticleLookup[0];
+            if (neighborIndex == id.x) continue; // Skip self
+            Particle otherParticle = _ParticleBuffer[neighborIndex];
+            float3 diff = particle.predictPosition - otherParticle.predictPosition;
+            if (dot(diff, diff) > squaredRadius) continue;
 
-        float3 dir = distance > 0 ? normalize(diff) : float3(0, 1, 0);
+            float distance = length(diff);
+            float3 dir = distance > 0 ? normalize(diff) : float3(0.0, 1.0, 0.0);
 
-        pressureForce += dir * mass * meanPressure * smoothingKernelDerivative(distance, radius); // eq. 10
+            float ngbDensity = otherParticle.density; // pi + pj / (2 * rhoj)
+            float ngbPressure = (ngbDensity - targetDensity) * pressureMultiplier;
+            float sharedPressure = (pressure + ngbPressure) / 2; // (2.0 * ngbDensity);
+
+            float ngbNearDensity = otherParticle.nearDensity; 
+            float ngbNearPressure = (ngbNearDensity - targetDensity) * pressureMultiplier;
+            float sharedNearPressure = (nearPressure + ngbNearPressure) / 2; // (2.0 * ngbNearDensity);
+
+            pressureForce += dir * SpikyKernelPow2(distance, radius) * sharedPressure; // eq. 10 in SPH paper
+            pressureForce += dir * SpikyKernelPow3(distance, radius) * sharedNearPressure;
+        }
     }
-
-    float3 acceleration = pressureForce / max(particle.density, 0.001f); // eq. 8
+    const float eps = 0.0001;
+    float3 acceleration = pressureForce / max(eps, density); // eq. 10 in SPH paper
     particle.velocity += acceleration * _DeltaTime;
     _ParticleBuffer[id.x] = particle;
 }
@@ -144,19 +179,32 @@ void calcViscosityForce(uint3 id : SV_DispatchThreadID) {
     if (id.x >= numParticles) return;
     Particle particle = _ParticleBuffer[id.x];
     
+    int3 centerCell = PositionToCell3D(particle.predictPosition, radius);
+
     float3 viscosityForce = 0;
     float3 velocity = particle.velocity;
 
-    for (uint i = 0; i < numParticles; i++) {
-        if (i == id.x) continue; // Skip self
-        Particle otherParticle = _ParticleBuffer[i];
-        float3 diff = particle.position - otherParticle.position;
-        float distance = length(diff);
+    for (int i = 0; i<27; i++) {
+        uint cellHash = HashCell3D(centerCell + inRadCellOffset[i]);
+        uint cellKey = KeyFromHash(cellHash, numParticles);
+        uint currIndex = _startIndicesBuffer[cellKey]; // starting here, key matches
+        while (currIndex < numParticles) {
+            // should match key and hash
+            uint3 currParticleLookup = _SpatialLookupBuffer[currIndex++];
+            if (currParticleLookup[2] != cellKey) break; // No more neighbors in this cell
+            if (currParticleLookup[1] != cellHash) continue; // Fake neighbor :(
+            
+            uint neighborIndex = currParticleLookup[0];
+            if (neighborIndex == id.x) continue; // Skip self
+            Particle otherParticle = _ParticleBuffer[neighborIndex];
+            float3 diff = particle.predictPosition - otherParticle.predictPosition;
+            if (dot(diff, diff) > squaredRadius) continue; // Too far, avoid floating point 
 
-        if (distance > radius) continue;
-
-        viscosityForce += (otherParticle.velocity - velocity) * SmoothingKernelPoly6(distance, radius);
+            float distance = length(diff);
+            viscosityForce += (otherParticle.velocity - velocity) * SmoothingKernelPoly6(distance, radius);
+        }
     }
+
     particle.velocity += viscosityForce * _DeltaTime * viscosityStrength; //viscosityStrength = mu
     _ParticleBuffer[id.x] = particle;
 }
@@ -171,68 +219,19 @@ void UpdatePositions(uint3 id : SV_DispatchThreadID) {
     HandleBoundingBoxCollision(id);
 }
 
-    float3 localPos = mul(worldToLocal, float4(particle.position, 1.0)).xyz;
-    float3 localVelocity = mul(worldToLocal, float4(particle.velocity, 0.0)).xyz;
-}
-
-// helper function start
-int3 PositionToCellCoord(float3 point, float radius)
-{
-    int cellX = (int)(point.x / radius);
-    int cellY = (int)(point.y / radius);
-    int cellZ = (int)(point.z / radius);
-    return int3(cellX, cellY, cellZ);
-}
-
-uint HashCell(int cellX, int cellY, int cellZ)
-{
-    uint a = (uint)(cellX) * 73856093;
-    uint b = (uint)(cellY) * 19349663;
-    uint c = (uint)(cellZ) * 83492791;
-    return a ^ b ^ c;
-}
-
-uint GetKeyFromHash(uint hash)
-{
-    return hash % _SpatialLookupLength;
-}
-// helper function end
 [numthreads(NumThreads, 1, 1)]
-void SpatialQueryKernel(uint3 id : SV_DispatchThreadID)
-{
-    if (id.x >= _NumPoints) return;
+void UpdateSpatialHash(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= numParticles) return;
 
-    Particle me = _ParticleBuffer[id.x];
-    float3 samplePoint = me.position;
+    Particle particle = _ParticleBuffer[id.x];
+    _startIndicesBuffer[id.x] = numParticles; // Initialize to max value
 
-    float sqrRadius = _Radius * _Radius;
+    uint hash = HashCell3D(PositionToCell3D(particle.predictPosition, radius));
+    uint cellKey = KeyFromHash(hash, numParticles);
 
-    int2 centre = PositionToCellCoord(samplePoint, _Radius);
+    // Update the spatial hash table
+    _SpatialLookupBuffer[id.x] = uint3(uint(id.x), hash, cellKey);
 
-    float3 force = float3(0, 0, 0);
-
-    for (int ox = -1; ox <= 1; ox++)
-    for (int oy = -1; oy <= 1; oy++)
-    for (int oz = -1; oz <= 1; oz++)
-    {
-        uint key = GetKeyFromHash(HashCell(centre.x + ox, centre.y + oy, centre.z + oz));
-        uint start = _StartIndices[key];
-        uint end = (key + 1 < _SpatialLookupLength) ? _StartIndices[key + 1] : _NumPoints;
-
-        for (uint i = start; i < end; i++)
-        {
-            uint neighborIdx = _SpatialLookup[i].pointIndex;
-            Particle neighbor = _ParticleBuffer[neighborIdx];
-            float3 neighborPos = neighbor.position;
-
-            float d2 = distance(neighborPos, samplePoint);
-            if (d2 < sqrRadius)
-            {
-                // 範例行為：累積方向向量 (idk why chatGPT do this)
-                force += normalize(neighborPos - samplePoint);
-            }
-        }
-    }
-    me.currentForce = force;
-    _ParticleBuffer[id.x] = me;
+    // Sorting will be handled by GPU, see BitonicMergeSort.compute
 }
+

@@ -149,21 +149,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7da0ff73bd2cc9c998612982aabff1e7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  MAX_PARTICLES: 1000
   pauseNextFrame: 1
   iterationPerFrame: 1
-  timeScale: 1
-  gravity: {x: 0, y: -0.62, z: 0}
-  targetDensity: 1000
-  pressureMultiplier: 0.1
-  ngbPressureMultiplier: 0.1
+  timeScale: 0.2
+  gravity: {x: 0, y: -9.8, z: 0}
+  targetDensity: 2
+  pressureMultiplier: 20
+  ngbPressureMultiplier: 1
   particleMass: 1
-  particleRadius: 0.1
-  numToSpawn: {x: 100, y: 100, z: 100}
-  spawnBoundSize: 10
+  particleRadius: 1
+  viscosityStrength: 0.1
+  numToSpawn: {x: 10000, y: 100, z: 100}
+  spawnBoundSize: 1
   spawnBasePosition: {x: 0, y: 5, z: 0}
   useParentPosition: 1
   jitLength: 0.5
-  initVelocity: {x: 1, y: 0.2, z: 3}
+  initVelocity: {x: 0, y: 0.2, z: 0}
   particleRenderer: {fileID: 635261037}
   onSimulationComplete:
     m_PersistentCalls:
@@ -199,7 +201,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   particleMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
   particleMaterial: {fileID: 2100000, guid: 76ec47c569ad448b3bea6e5b187f6665, type: 2}
-  particleRadius: 0.05
+  particleRadius: 0.01
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
@@ -383,7 +385,7 @@ Transform:
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 3.081, z: -6.96}
+  m_LocalPosition: {x: 0, y: 5, z: -2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

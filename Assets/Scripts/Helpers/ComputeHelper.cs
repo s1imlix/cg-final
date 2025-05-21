@@ -24,6 +24,11 @@ namespace CGFinal.Helpers {
             return buffer;
         }
 
+        public static ComputeBuffer CreateStructBuffer<T>(int length) {
+            var buffer = new ComputeBuffer(length, GetStride<T>());
+            return buffer;
+        }
+
         public static GraphicsBuffer CreateArgsBuffer(Mesh particleMesh, int numInstances) {
             GraphicsBuffer _argsBuffer 
                 = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 
@@ -55,7 +60,7 @@ namespace CGFinal.Helpers {
                 shader.SetBuffer(kernelIndex, name, buffer);
             }
         }
-
+        
         public static Vector3Int GetThreadGroupSizes(ComputeShader shader, int kernelIndex) {
             // https://docs.unity3d.com/6000.1/Documentation/ScriptReference/ComputeShader.GetKernelThreadGroupSizes.html
             uint x, y, z;

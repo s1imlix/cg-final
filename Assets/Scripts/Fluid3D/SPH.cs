@@ -12,10 +12,18 @@ public struct Particle
 {
     public Vector3 position;
     public Vector3 velocity;
-    public Vector3 currentForce;
+    public Vector3 predictPosition;
     public float density;
-    public float pressure;
+    public float nearDensity;
 }
+
+[StructLayout(LayoutKind.Sequential, Size = 12)]
+struct Entry
+{
+    uint pointIndex;
+	uint cellHash;
+    uint cellKey;
+};
 
 public class SPH : MonoBehaviour
 {
@@ -40,6 +48,10 @@ public class SPH : MonoBehaviour
 
     public float particleMass = 1f;
     public float particleRadius = 0.1f; // radius of the particle
+
+    public float viscosityStrength = 0.1f;
+
+    public float collisionDamping = 0.1f;
 
     [Header("Spawner settings")]
     public Vector3Int numToSpawn = new Vector3Int(10, 10, 10);
@@ -66,9 +78,11 @@ public class SPH : MonoBehaviour
     const int calcDensity = 2;
     const int calcPressureForce = 3;
     const int calcViscosityForce = 4;
-    const int SpatialQueryKernel = 5;
+    const int UpdateSpatialHash = 5;
 
     public FixedRadiusNeighbourSearch fixedRadiusNeighbourSearch = new FixedRadiusNeighbourSearch();
+
+    GPUSort gpuBMS;
     private ComputeBuffer _spatialLookupBuffer;
     private ComputeBuffer _startIndicesBuffer;
     
@@ -132,9 +146,18 @@ public class SPH : MonoBehaviour
             later updates directly on GPU by computeShader.
             @stride: size of each element in the buffer, sizeof(Particle) = 44 bytes
         */
-        _particleBuffer = ComputeHelper.CreateStructBuffer(particles);  
+        _particleBuffer = ComputeHelper.CreateStructBuffer(particles); 
+        _spatialLookupBuffer = ComputeHelper.CreateStructBuffer<Entry>(_particleCount);
+        _startIndicesBuffer = ComputeHelper.CreateStructBuffer<uint>(_particleCount);
         ComputeHelper.SetBuffer(computeShader, _particleBuffer, "_ParticleBuffer", 
-                                ExternalGravity, UpdatePositions, calcDensity, calcPressureForce, calcViscosityForce);
+                                ExternalGravity, UpdatePositions, calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash);
+        ComputeHelper.SetBuffer(computeShader, _spatialLookupBuffer, "_SpatialLookupBuffer",
+                                calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash);
+        ComputeHelper.SetBuffer(computeShader, _startIndicesBuffer, "_startIndicesBuffer",
+                                calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash);
+        gpuBMS = new();
+        gpuBMS.SetBuffers(_spatialLookupBuffer, _startIndicesBuffer);   
+
         particleRenderer.Init(this);
     }
 
@@ -158,8 +181,11 @@ public class SPH : MonoBehaviour
         computeShader.SetFloat("targetDensity", targetDensity);
         computeShader.SetFloat("pressureMultiplier", pressureMultiplier);
         computeShader.SetFloat("ngbPressureMultiplier", ngbPressureMultiplier);
+        computeShader.SetFloat("viscosityStrength", viscosityStrength);
         computeShader.SetFloat("mass", particleMass);
         computeShader.SetFloat("radius", particleRadius);
+        computeShader.SetFloat("squaredRadius", particleRadius * particleRadius);
+        computeShader.SetFloat("collisionDamping", collisionDamping);
         computeShader.SetInt("numParticles", _particleCount);
         computeShader.SetVector("_Gravity", gravity);
         computeShader.SetMatrix("worldToLocal", transform.worldToLocalMatrix);
@@ -169,8 +195,10 @@ public class SPH : MonoBehaviour
     void Simulate() {
         // Dispatch your work here
         Particle[] _particles = ComputeHelper.DebugStructBuffer<Particle>(_particleBuffer, 1);
-        Debug.Log($"Particle velocity: {_particles[0].velocity}, density: {_particles[0].density}, pressure: {_particles[0].pressure}");
-        ComputeHelper.Dispatch(computeShader, _particleCount, ExternalGravity); 
+        Debug.Log($"Particle velocity: {_particles[0].velocity}, density: {_particles[0].density}");
+        ComputeHelper.Dispatch(computeShader, _particleCount, ExternalGravity);
+        ComputeHelper.Dispatch(computeShader, _particleCount, UpdateSpatialHash); 
+        gpuBMS.SortAndCalculateOffsets();   
         ComputeHelper.Dispatch(computeShader, _particleCount, calcDensity);
         ComputeHelper.Dispatch(computeShader, _particleCount, calcPressureForce);
         ComputeHelper.Dispatch(computeShader, _particleCount, calcViscosityForce);
@@ -236,9 +264,7 @@ public class SPH : MonoBehaviour
     }
 
     void OnDestroy(){
-        ComputeHelper.Release(_particleBuffer);
-        ComputeHelper.Release(_spatialLookupBuffer);
-        ComputeHelper.Release(_startIndicesBuffer);
+        ComputeHelper.Release(_particleBuffer, _spatialLookupBuffer, _startIndicesBuffer);
     }
 
 }

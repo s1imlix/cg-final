@@ -9,16 +9,14 @@ public class FixedRadiusNeighbourSearch
     private Vector3[] points;
     private float radius;
 
-    public Entry[] SpatialLookup => spatialLookup;
-    public int[] StartIndices => startIndices;
 
     public void UpdateSpatialLookup(Vector3[] points, float radius)
     {
         this.points = points;
         this.radius = radius;
 
-        spatialLookup = new Entry[points.Length];
-        startIndices = new int[points.Length];
+        spatialLookup = new Entry[points.Length]; // Stored h(cell(point)) 
+        startIndices = new int[points.Length]; // startIndices[key] stores the first index of key after sort
 
         Parallel.For(0, points.Length, i =>
         {
