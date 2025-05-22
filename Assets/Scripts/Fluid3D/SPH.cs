@@ -1,10 +1,10 @@
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
 using CGFinal.Helpers;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
-using System.Linq;
 
 [System.Serializable]
 [StructLayout(LayoutKind.Sequential, Size = 44)]
@@ -55,7 +55,6 @@ public class SPH : MonoBehaviour
 
     [Header("Spawner settings")]
     public Vector3Int numToSpawn = new Vector3Int(10, 10, 10);
-    public float spawnBoundSize = 1f;
     public Vector3 spawnBasePosition = new Vector3(0f, 0f, 0f);
     public bool useParentPosition = true;
     public float jitLength = 0.5f;
@@ -80,12 +79,12 @@ public class SPH : MonoBehaviour
     const int calcViscosityForce = 4;
     const int UpdateSpatialHash = 5;
 
-    public FixedRadiusNeighbourSearch fixedRadiusNeighbourSearch = new FixedRadiusNeighbourSearch();
-
     GPUSort gpuBMS;
     private ComputeBuffer _spatialLookupBuffer;
     private ComputeBuffer _startIndicesBuffer;
-    
+
+    private ComputeBuffer _debug;
+    private uint[] _debugInit = new uint[1]{0};
 
     void InitializeParticles()
     {
@@ -112,9 +111,9 @@ public class SPH : MonoBehaviour
                     float dy = y / (numParticlesY - 1);
                     float dz = z / (numParticlesZ - 1);
 
-                    float px = (dx - 0.5f) * spawnBoundSize;
-                    float py = (dy - 0.5f) * spawnBoundSize;
-                    float pz = (dz - 0.5f) * spawnBoundSize;
+                    float px = (dx - 0.5f) * transform.localScale.x;
+                    float py = (dy - 0.5f) * transform.localScale.y;
+                    float pz = (dz - 0.5f) * transform.localScale.z;
 
                     // Calculate the position of the particle
                     Vector3 _offset = new Vector3(px, py, pz) * particleRenderer.particleRadius;
@@ -140,6 +139,10 @@ public class SPH : MonoBehaviour
     void Start()
     {
         InitializeParticles();
+        Debug.Log("Graphics Device: " + SystemInfo.graphicsDeviceName);
+        Debug.Log("Graphics Vendor: " + SystemInfo.graphicsDeviceVendor);
+        Debug.Log("Graphics Type: " + SystemInfo.graphicsDeviceType);
+
         /*        
             ComputeBuffer will handle particle simulation
             Here, we only set _particleBuffer on CPU once, 
@@ -149,16 +152,19 @@ public class SPH : MonoBehaviour
         _particleBuffer = ComputeHelper.CreateStructBuffer(particles); 
         _spatialLookupBuffer = ComputeHelper.CreateStructBuffer<Entry>(_particleCount);
         _startIndicesBuffer = ComputeHelper.CreateStructBuffer<uint>(_particleCount);
+        // _debug = ComputeHelper.CreateStructBuffer<uint>(1);
         ComputeHelper.SetBuffer(computeShader, _particleBuffer, "_ParticleBuffer", 
                                 ExternalGravity, UpdatePositions, calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash);
         ComputeHelper.SetBuffer(computeShader, _spatialLookupBuffer, "_SpatialLookupBuffer",
                                 calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash);
         ComputeHelper.SetBuffer(computeShader, _startIndicesBuffer, "_startIndicesBuffer",
                                 calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash);
+        // ComputeHelper.SetBuffer(computeShader, _debug, "_DebugBuffer", calcPressureForce);
         gpuBMS = new();
         gpuBMS.SetBuffers(_spatialLookupBuffer, _startIndicesBuffer);   
 
         particleRenderer.Init(this);
+
     }
 
     void SimulateFrame(float deltaTime)
@@ -177,7 +183,7 @@ public class SPH : MonoBehaviour
     void UpdateSettings(float timeStep) {
         // Set global variables in compute shader
         computeShader.SetFloat("_DeltaTime", timeStep);
-        computeShader.SetFloat("halfBoxWidth", spawnBoundSize / 2.0f);
+        computeShader.SetVector("halfBoxScale", transform.localScale * 0.5f);
         computeShader.SetFloat("targetDensity", targetDensity);
         computeShader.SetFloat("pressureMultiplier", pressureMultiplier);
         computeShader.SetFloat("ngbPressureMultiplier", ngbPressureMultiplier);
@@ -190,19 +196,23 @@ public class SPH : MonoBehaviour
         computeShader.SetVector("_Gravity", gravity);
         computeShader.SetMatrix("worldToLocal", transform.worldToLocalMatrix);
         computeShader.SetMatrix("localToWorld", transform.localToWorldMatrix);
+
+        // _debug.SetData(_debugInit); // Counts total time of interaction
     }
 
     void Simulate() {
         // Dispatch your work here
-        Particle[] _particles = ComputeHelper.DebugStructBuffer<Particle>(_particleBuffer, 1);
-        Debug.Log($"Particle velocity: {_particles[0].velocity}, density: {_particles[0].density}");
+        // Particle[] _particles = ComputeHelper.DebugStructBuffer<Particle>(_particleBuffer, 1);
+        // Debug.Log($"Particle velocity: {_particles[0].velocity}, density: {_particles[0].density}");
         ComputeHelper.Dispatch(computeShader, _particleCount, ExternalGravity);
         ComputeHelper.Dispatch(computeShader, _particleCount, UpdateSpatialHash); 
-        gpuBMS.SortAndCalculateOffsets();   
+        gpuBMS.SortAndCalculateOffsets();
         ComputeHelper.Dispatch(computeShader, _particleCount, calcDensity);
         ComputeHelper.Dispatch(computeShader, _particleCount, calcPressureForce);
         ComputeHelper.Dispatch(computeShader, _particleCount, calcViscosityForce);
         ComputeHelper.Dispatch(computeShader, _particleCount, UpdatePositions);
+
+        // Debug.Log($"DebugBuffer: {ComputeHelper.DebugStructBuffer<uint>(_debug, 1)[0]}");
     }
 
     void Update() {
@@ -243,18 +253,9 @@ public class SPH : MonoBehaviour
 
     void OnDrawGizmos()
     {
-        // Draw the particles in the scene view
-        if (particles != null)
-        {
-            Gizmos.color = Color.white;
-            for (int i = 0; i < _particleCount && i < particles.Length; i++)
-            {
-                Gizmos.DrawSphere(particles[i].position, particleRenderer.particleRadius);
-            }
-        }
 
         Gizmos.color = Color.red;
-        Gizmos.DrawWireCube(spawnBasePosition, spawnBoundSize * Vector3.one);
+        Gizmos.DrawWireCube(transform.position, transform.localScale*2);
 
         if (!Application.isPlaying)
         {

@@ -25,11 +25,12 @@ const uint numParticles;
 
 RWStructuredBuffer<uint3> _SpatialLookupBuffer;
 RWStructuredBuffer<uint> _startIndicesBuffer;
+// RWStructuredBuffer<uint> _DebugBuffer;
 
 float _DeltaTime;
 const float3 _Gravity;
 
-const float halfBoxWidth;
+const float3 halfBoxScale;
 const float4x4 localToWorld;
 const float4x4 worldToLocal;
 
@@ -65,19 +66,19 @@ void HandleBoundingBoxCollision(uint3 id : SV_DispatchThreadID) {
     float3 localVelocity = mul(worldToLocal, float4(particle.velocity, 0.0)).xyz;
 
     // Check for collision with the bounding box
-    if (localPos.x < -halfBoxWidth || localPos.x > halfBoxWidth) {
+    if (localPos.x < -halfBoxScale.x || localPos.x > halfBoxScale.x) {
         localVelocity.x = -localVelocity.x * collisionDamping; 
-        localPos.x = clamp(localPos.x, -halfBoxWidth, halfBoxWidth);
+        localPos.x = clamp(localPos.x, -halfBoxScale.x, halfBoxScale.x);
     }
 
-    if (localPos.y < -halfBoxWidth || localPos.y > halfBoxWidth) {
-        localVelocity.y = -localVelocity.y * collisionDamping;
-        localPos.y = clamp(localPos.y, -halfBoxWidth, halfBoxWidth);
+    if (localPos.y < -halfBoxScale.y || localPos.y > halfBoxScale.y) {
+        localVelocity.y = -localVelocity.y * collisionDamping; 
+        localPos.y = clamp(localPos.y, -halfBoxScale.y, halfBoxScale.y);
     }
 
-    if (localPos.z < -halfBoxWidth || localPos.z > halfBoxWidth) {
-        localVelocity.z = -localVelocity.z * collisionDamping;
-        localPos.z = clamp(localPos.z, -halfBoxWidth, halfBoxWidth);
+    if (localPos.z < -halfBoxScale.z || localPos.z > halfBoxScale.z) {
+        localVelocity.z = -localVelocity.z * collisionDamping; 
+        localPos.z = clamp(localPos.z, -halfBoxScale.z, halfBoxScale.z);
     }
 
     // Transform back to world space
@@ -151,6 +152,8 @@ void calcPressureForce(uint3 id : SV_DispatchThreadID) {
             Particle otherParticle = _ParticleBuffer[neighborIndex];
             float3 diff = particle.predictPosition - otherParticle.predictPosition;
             if (dot(diff, diff) > squaredRadius) continue;
+
+            // InterlockedAdd(_DebugBuffer[0], 1); // Debugging: count the number of neighbors
 
             float distance = length(diff);
             float3 dir = distance > 0 ? normalize(diff) : float3(0.0, 1.0, 0.0);

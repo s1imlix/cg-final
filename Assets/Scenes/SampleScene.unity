@@ -149,19 +149,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7da0ff73bd2cc9c998612982aabff1e7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  MAX_PARTICLES: 1000
+  MAX_PARTICLES: 40000
   pauseNextFrame: 1
   iterationPerFrame: 1
-  timeScale: 0.2
+  timeScale: 0.1
   gravity: {x: 0, y: -9.8, z: 0}
-  targetDensity: 2
+  targetDensity: 80
   pressureMultiplier: 20
-  ngbPressureMultiplier: 1
-  particleMass: 1
-  particleRadius: 1
-  viscosityStrength: 0.1
+  ngbPressureMultiplier: 5
+  particleMass: 5
+  particleRadius: 0.4
+  viscosityStrength: 0.09
+  collisionDamping: 0.1
   numToSpawn: {x: 10000, y: 100, z: 100}
-  spawnBoundSize: 1
   spawnBasePosition: {x: 0, y: 5, z: 0}
   useParentPosition: 1
   jitLength: 0.5
@@ -182,7 +182,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 5, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 3, y: 2, z: 4}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -199,9 +199,42 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 887bc1966b42fc99682782e5d2188010, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  particleMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+  particleMesh: {fileID: 4711208715938537054, guid: a63cac959331dfa39a94e19a62511749, type: 3}
   particleMaterial: {fileID: 2100000, guid: 76ec47c569ad448b3bea6e5b187f6665, type: 2}
-  particleRadius: 0.01
+  particleRadius: 0.1
+  isRendering: 1
+  useMaterialColor: 0
+  speedGradient:
+    serializedVersion: 2
+    key0: {r: 0.20724538, g: 0.2998225, b: 0.59377706, a: 1}
+    key1: {r: 0.27859685, g: 0.5820968, b: 0.41935784, a: 1}
+    key2: {r: 0.3634357, g: 0.91772866, b: 0.21196857, a: 0}
+    key3: {r: 0.98104167, g: 0.9882991, b: 0.13928458, a: 0}
+    key4: {r: 0.93184966, g: 0.0369112, b: 0.044577584, a: 0}
+    key5: {r: 0, g: 0, b: 0, a: 0}
+    key6: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 0, g: 0, b: 0, a: 0}
+    ctime0: 0
+    ctime1: 16384
+    ctime2: 32768
+    ctime3: 49151
+    ctime4: 65535
+    ctime5: 0
+    ctime6: 0
+    ctime7: 0
+    atime0: 31875
+    atime1: 65535
+    atime2: 0
+    atime3: 0
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 5
+    m_NumAlphaKeys: 2
+  maxGradientVelocity: 100
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
@@ -384,13 +417,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 5, z: -2}
+  m_LocalRotation: {x: 0.13052616, y: 0, z: 0, w: 0.9914449}
+  m_LocalPosition: {x: 0, y: 7, z: -9}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 15, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

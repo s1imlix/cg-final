@@ -2,7 +2,8 @@ Shader "Custom/ParticleSphere" {
     // Shader assigned to material and material is assigned to meshes, 
     // here we define how the meshes should be rendered
     Properties {
-        _Color ("Color", Color) = (0.3,0.5,1,1)
+        _Color ("Color", Color) = (0,0,1,1)
+        _GradientTex ("Gradient Texture", 2D) = "white" {}
     }
     SubShader {
         Tags { "RenderType"="Opaque" }
@@ -15,7 +16,8 @@ Shader "Custom/ParticleSphere" {
         pragma surface surf -> defines surf() as the surface function
         surf(): (UV, ...) -> (Albedo, Normal, Specular, etc.)
         */
-        #pragma surface surf Lambert 
+        #pragma surface surf Standard addshadow fullforwardshadows vertex:vert
+        #pragma multi_compile_instancing
 
         /*
         GPU instancing: CPU does transform -> GPU rendering multiple meshes at once
@@ -26,20 +28,25 @@ Shader "Custom/ParticleSphere" {
         
         struct Input {
             float2 uv_MainTex;
+            float4 color;
         };
         
         float4 _Color;
         float _ParticleRadius;
+        int useMaterialColor;
+        sampler2D _GradientTex;
+        float Vmax;
         
+
         #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
-            struct Particle {
+            struct Particle
+            {
                 float3 position;
                 float3 velocity;
-                float3 currentForce;
+                float3 predictPosition;
                 float density;
-                float pressure;
+                float nearDensity;
             };
-            
             StructuredBuffer<Particle> _ParticleBuffer;
         #endif
         
@@ -56,11 +63,26 @@ Shader "Custom/ParticleSphere" {
             #endif
         }
         
-        void surf (Input IN, inout SurfaceOutput o) {
-            o.Albedo = _Color.rgb;
+        void vert(inout appdata_full v, out Input o) {
+            if (useMaterialColor == 0) return;
+            
+            UNITY_INITIALIZE_OUTPUT(Input, o);
+
+            #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
+            float3 pv = _ParticleBuffer[unity_InstanceID].velocity;
+            float speedNorm = saturate(length(pv) / Vmax);
+            // https://developer.download.nvidia.com/cg/tex2Dlod.html
+            o.color = tex2Dlod(_GradientTex, float4(speedNorm, 0.5, 0, 0));
+            #endif
+        }
+
+        void surf (Input IN, inout SurfaceOutputStandard o) {
+            o.Albedo = useMaterialColor == 1 ? _Color.rgb : IN.color;
+            o.Alpha = 1.0;
+            o.Metallic = 0.0;
+            o.Smoothness = 0.0;
         }
         ENDCG
     }
     FallBack "Diffuse"
 }
-// ok this one is just gpt i dont have a clue how to write one myself
