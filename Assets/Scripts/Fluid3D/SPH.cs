@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.InputSystem;
-using UnityEngine.Rendering;
 using CGFinal.Helpers;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
@@ -38,28 +37,29 @@ public class SPH : MonoBehaviour
     [Header("Simulation settings")]
     public bool pauseNextFrame = false;
     private bool isPaused;
-    public int iterationPerFrame = 1;
-    public float timeScale = 1f;
+    public bool showBoundingBox;
+    public int iterationPerFrame;
+    public float timeScale;
 
-    public Vector3 gravity = new Vector3(0f, -9.81f, 0f); 
-    public float targetDensity = 1000f;  
-    public float pressureMultiplier = 0.1f;
-    public float ngbPressureMultiplier = 0.1f;
+    public Vector3 gravity; 
+    public float targetDensity; 
+    public float pressureMultiplier;
+    public float ngbPressureMultiplier;
 
-    public float particleMass = 1f;
-    public float particleRadius = 0.1f; // radius of the particle
+    public float particleMass;
+    public float particleRadius; // radius of the particle
 
-    public float viscosityStrength = 0.1f;
+    public float viscosityStrength;
 
-    public float collisionDamping = 0.1f;
+    public float collisionDamping;
 
     [Header("Spawner settings")]
-    public Vector3Int numToSpawn = new Vector3Int(10, 10, 10);
-    public Vector3 spawnBasePosition = new Vector3(0f, 0f, 0f);
-    public bool useParentPosition = true;
-    public float jitLength = 0.5f;
+    public Vector3Int numToSpawn;
+    public Vector3 spawnBasePosition;
+    public bool useParentPosition;
+    public float jitLength;
 
-    public Vector3 initVelocity = new Vector3(0f, 5f, 0f);  
+    public Vector3 initVelocity;
 
     [Header("Rendering")]
 
@@ -83,8 +83,8 @@ public class SPH : MonoBehaviour
     private ComputeBuffer _spatialLookupBuffer;
     private ComputeBuffer _startIndicesBuffer;
 
-    private ComputeBuffer _debug;
-    private uint[] _debugInit = new uint[1]{0};
+    // private ComputeBuffer _debug;
+    // private uint[] _debugInit = new uint[1]{0};
 
     void InitializeParticles()
     {
@@ -253,15 +253,37 @@ public class SPH : MonoBehaviour
 
     void OnDrawGizmos()
     {
-
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireCube(transform.position, transform.localScale*2);
-
         if (!Application.isPlaying)
         {
             Gizmos.color = Color.cyan;
             Gizmos.DrawWireSphere(spawnBasePosition, 0.1f);
         }
+
+        if (!showBoundingBox) return;
+
+        Gizmos.color = Color.red;
+
+        Matrix4x4 matrix = transform.localToWorldMatrix;
+        Vector3 halfScale = transform.localScale * 0.5f;
+
+        // Build corner offsets
+        Vector3[] corners = new Vector3[8];
+        int i = 0;
+        for (int x = -1; x <= 1; x += 2)
+        for (int y = -1; y <= 1; y += 2)
+        for (int z = -1; z <= 1; z += 2)
+        {
+            Vector3 localCorner = new Vector3(x * halfScale.x, y * halfScale.y, z * halfScale.z);
+            corners[i++] = matrix.MultiplyPoint3x4(localCorner);
+        }
+
+        // Draw edges between corners
+        void DrawEdge(int a, int b) => Gizmos.DrawLine(corners[a], corners[b]);
+
+        // 12 edges of the box
+        DrawEdge(0, 1); DrawEdge(1, 3); DrawEdge(3, 2); DrawEdge(2, 0);
+        DrawEdge(4, 5); DrawEdge(5, 7); DrawEdge(7, 6); DrawEdge(6, 4);
+        DrawEdge(0, 4); DrawEdge(1, 5); DrawEdge(2, 6); DrawEdge(3, 7);
     }
 
     void OnDestroy(){

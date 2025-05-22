@@ -234,7 +234,7 @@ MonoBehaviour:
     m_ColorSpace: -1
     m_NumColorKeys: 5
     m_NumAlphaKeys: 2
-  maxGradientVelocity: 100
+  maxGradientVelocity: 50
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0

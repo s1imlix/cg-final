@@ -16,7 +16,8 @@ Shader "Custom/ParticleSphere" {
         pragma surface surf -> defines surf() as the surface function
         surf(): (UV, ...) -> (Albedo, Normal, Specular, etc.)
         */
-        #pragma surface surf Standard addshadow fullforwardshadows vertex:vert
+        #pragma surface surf Lambert
+        #pragma vertex vert
         #pragma multi_compile_instancing
 
         /*
@@ -28,7 +29,7 @@ Shader "Custom/ParticleSphere" {
         
         struct Input {
             float2 uv_MainTex;
-            float4 color;
+            float3 color;
         };
         
         float4 _Color;
@@ -60,27 +61,24 @@ Shader "Custom/ParticleSphere" {
                 unity_ObjectToWorld._12_22_32_42 = float4(0, scale, 0, 0);
                 unity_ObjectToWorld._13_23_33_43 = float4(0, 0, scale, 0);
                 unity_ObjectToWorld._14_24_34_44 = float4(particle.position, 1); 
+
+                
             #endif
         }
-        
-        void vert(inout appdata_full v, out Input o) {
-            if (useMaterialColor == 0) return;
-            
-            UNITY_INITIALIZE_OUTPUT(Input, o);
 
+        void vert(inout appdata_full v, out Input o) {
+            UNITY_INITIALIZE_OUTPUT(Input, o);
+    
             #ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
             float3 pv = _ParticleBuffer[unity_InstanceID].velocity;
             float speedNorm = saturate(length(pv) / Vmax);
-            // https://developer.download.nvidia.com/cg/tex2Dlod.html
-            o.color = tex2Dlod(_GradientTex, float4(speedNorm, 0.5, 0, 0));
+            o.color = tex2Dlod(_GradientTex, float4(speedNorm, 0.5, 0, 0)); // sample color here
             #endif
         }
 
-        void surf (Input IN, inout SurfaceOutputStandard o) {
-            o.Albedo = useMaterialColor == 1 ? _Color.rgb : IN.color;
+        void surf (Input IN, inout SurfaceOutput o) {
+            o.Albedo = useMaterialColor == 1 ? _Color.rgb : IN.color.rgb;
             o.Alpha = 1.0;
-            o.Metallic = 0.0;
-            o.Smoothness = 0.0;
         }
         ENDCG
     }

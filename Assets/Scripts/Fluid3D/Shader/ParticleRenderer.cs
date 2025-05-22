@@ -37,6 +37,7 @@ public class ParticleRenderer : MonoBehaviour
         _argsBuffer = ComputeHelper.CreateArgsBuffer(particleMesh, sph._particleCount);
         particleMaterial.SetBuffer("_ParticleBuffer", sph._particleBuffer);
 
+
         bounds = new Bounds(Vector3.zero, Vector3.one * 100f);
     }
 
