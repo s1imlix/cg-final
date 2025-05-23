@@ -57,16 +57,26 @@ public class MarchingCubeRenderer : MonoBehaviour
         samplePositions = new Vector3[numSamples];
         sampleDensities = new float[numSamples];
         int ind = 0;
-        for (int x = 0; x < resolution.x + 1; x++)
-        {
-            for (int y = 0; y < resolution.y + 1; y++)
-            {
-                for (int z = 0; z < resolution.z + 1; z++)
-                {
+        SPH sphSystem = FindFirstObjectByType<SPH>();
+        
+        Vector3 boxSize = sphSystem.transform.localScale;
+        Vector3 boxCenter = sphSystem.transform.position;
+        
+        Vector3 minCorner = boxCenter - boxSize * 0.5f;
+        
+        Vector3 stepSize = new Vector3(
+            boxSize.x / resolution.x,
+            boxSize.y / resolution.y,
+            boxSize.z / resolution.z
+        );
+        
+        for (int x = 0; x <= resolution.x; x++){
+            for (int y = 0; y <= resolution.y; y++){
+                for (int z = 0; z <= resolution.z; z++){
                     samplePositions[ind] = new Vector3(
-                        x * (1f / resolution.x),
-                        y * (1f / resolution.y),
-                        z * (1f / resolution.z)
+                        minCorner.x + x * stepSize.x,
+                        minCorner.y + y * stepSize.y,
+                        minCorner.z + z * stepSize.z
                     );
                     ind++;
                 }
