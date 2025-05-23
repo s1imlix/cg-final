@@ -64,6 +64,7 @@ public class SPH : MonoBehaviour
     [Header("Rendering")]
 
     public ParticleRenderer particleRenderer;
+    public MarchingCubeRenderer marchingCubeRenderer;
     public UnityEvent onSimulationComplete;
 
     [Header("Compute Shader")]
@@ -74,14 +75,14 @@ public class SPH : MonoBehaviour
     const int ExternalGravity = 0;
     const int UpdatePositions = 1;
 
-    const int calcDensity = 2;
+    public const int calcDensity = 2;
     const int calcPressureForce = 3;
     const int calcViscosityForce = 4;
     const int UpdateSpatialHash = 5;
 
     GPUSort gpuBMS;
-    private ComputeBuffer _spatialLookupBuffer;
-    private ComputeBuffer _startIndicesBuffer;
+    public ComputeBuffer _spatialLookupBuffer;
+    public ComputeBuffer _startIndicesBuffer;
 
     // private ComputeBuffer _debug;
     // private uint[] _debugInit = new uint[1]{0};
@@ -152,8 +153,7 @@ public class SPH : MonoBehaviour
         _particleBuffer = ComputeHelper.CreateStructBuffer(particles); 
         _spatialLookupBuffer = ComputeHelper.CreateStructBuffer<Entry>(_particleCount);
         _startIndicesBuffer = ComputeHelper.CreateStructBuffer<uint>(_particleCount);
-        // _debug = ComputeHelper.CreateStructBuffer<uint>(1);
-        ComputeHelper.SetBuffer(computeShader, _particleBuffer, "_ParticleBuffer", 
+         ComputeHelper.SetBuffer(computeShader, _particleBuffer, "_ParticleBuffer", 
                                 ExternalGravity, UpdatePositions, calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash);
         ComputeHelper.SetBuffer(computeShader, _spatialLookupBuffer, "_SpatialLookupBuffer",
                                 calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash);
@@ -164,7 +164,7 @@ public class SPH : MonoBehaviour
         gpuBMS.SetBuffers(_spatialLookupBuffer, _startIndicesBuffer);   
 
         particleRenderer.Init(this);
-
+        marchingCubeRenderer.Init(this);
     }
 
     void SimulateFrame(float deltaTime)
@@ -176,7 +176,7 @@ public class SPH : MonoBehaviour
 
         for (int i = 0; i<iterationPerFrame; i++) {
             Simulate();
-            // onSimulationComplete?.Invoke();
+            onSimulationComplete?.Invoke(); // Sample for marchingCube algorithm
         }
     }
 
@@ -204,6 +204,7 @@ public class SPH : MonoBehaviour
         // Dispatch your work here
         // Particle[] _particles = ComputeHelper.DebugStructBuffer<Particle>(_particleBuffer, 1);
         // Debug.Log($"Particle velocity: {_particles[0].velocity}, density: {_particles[0].density}");
+
         ComputeHelper.Dispatch(computeShader, _particleCount, ExternalGravity);
         ComputeHelper.Dispatch(computeShader, _particleCount, UpdateSpatialHash); 
         gpuBMS.SortAndCalculateOffsets();
@@ -211,8 +212,6 @@ public class SPH : MonoBehaviour
         ComputeHelper.Dispatch(computeShader, _particleCount, calcPressureForce);
         ComputeHelper.Dispatch(computeShader, _particleCount, calcViscosityForce);
         ComputeHelper.Dispatch(computeShader, _particleCount, UpdatePositions);
-
-        // Debug.Log($"DebugBuffer: {ComputeHelper.DebugStructBuffer<uint>(_debug, 1)[0]}");
     }
 
     void Update() {

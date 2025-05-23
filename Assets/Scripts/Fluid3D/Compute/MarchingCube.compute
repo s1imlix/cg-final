@@ -1,0 +1,36 @@
+#pragma kernel calcDensity
+
+[numthreads(NumThreads, 1, 1)]
+void calcDensity(uint3 id : SV_DispatchThreadID) {
+    // based on formula 3
+    if (id.x >= numParticles) return;
+    Particle particle = _ParticleBuffer[id.x];
+    int3 centerCell = PositionToCell3D(particle.predictPosition, radius);
+
+    float density = 0.0;
+    float nearDensity = 0.0;
+
+    for (int i = 0; i<27; i++) {
+        uint cellHash = HashCell3D(centerCell + inRadCellOffset[i]);
+        uint cellKey = KeyFromHash(cellHash, numParticles);
+        uint currIndex = _startIndicesBuffer[cellKey]; 
+        while (currIndex < numParticles) {
+            uint3 currParticleLookup = _SpatialLookupBuffer[currIndex++];
+            if (currParticleLookup[2] != cellKey) break; 
+            if (currParticleLookup[1] != cellHash) continue; 
+            
+            uint neighborIndex = currParticleLookup[0];
+            if (neighborIndex == id.x) continue; 
+            Particle otherParticle = _ParticleBuffer[neighborIndex];
+            float3 diff = particle.predictPosition - otherParticle.predictPosition;
+            if (dot(diff, diff) > squaredRadius) continue;
+
+            float distance = length(diff);
+            density += SpikyKernelPow2(distance, radius);
+            nearDensity += SpikyKernelPow3(distance, radius);
+        }
+    }
+    particle.density = density;
+    particle.nearDensity = nearDensity;
+    _ParticleBuffer[id.x] = particle;
+}
