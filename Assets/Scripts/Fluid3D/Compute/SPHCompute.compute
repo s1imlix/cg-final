@@ -249,7 +249,6 @@ void calcDensityPos(uint3 id : SV_DispatchThreadID) {
     float3 queryPosition = _QueryPositions[id.x];
     int3 centerCell = PositionToCell3D(queryPosition, radius);
     float density = 0.0;
-    float nearDensity = 0.0;
     for (int i = 0; i < 27; i++) {
         uint cellHash = HashCell3D(centerCell + inRadCellOffset[i]);
         uint cellKey = KeyFromHash(cellHash, numParticles);
@@ -268,7 +267,6 @@ void calcDensityPos(uint3 id : SV_DispatchThreadID) {
             if (distanceSquared > squaredRadius) continue; 
             float distance = sqrt(distanceSquared);
             density += SpikyKernelPow2(distance, radius);
-            nearDensity += SpikyKernelPow3(distance, radius);
         }
     }
     _DensityResults[id.x] = density;

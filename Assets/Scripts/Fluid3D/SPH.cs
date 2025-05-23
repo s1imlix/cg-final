@@ -79,7 +79,7 @@ public class SPH : MonoBehaviour
     const int calcPressureForce = 3;
     const int calcViscosityForce = 4;
     const int UpdateSpatialHash = 5;
-    const int calcDensityPos = 6;
+    public const int calcDensityPos = 6;
 
     GPUSort gpuBMS;
     public ComputeBuffer _spatialLookupBuffer;
@@ -87,8 +87,6 @@ public class SPH : MonoBehaviour
 
     public ComputeBuffer _queryPosBuffer;
     public ComputeBuffer _densityResultsBuffer;
-    private Vector3[] _queryPositions;
-    private float[] _densityResults;
 
     // private ComputeBuffer _debug;
     // private uint[] _debugInit = new uint[1]{0};
