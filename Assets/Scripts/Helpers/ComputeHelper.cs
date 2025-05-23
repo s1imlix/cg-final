@@ -1,12 +1,19 @@
 using UnityEngine;
 using UnityEngine.Rendering;
-using System.Collections.Generic;
-using System;
+using UnityEngine.Experimental.Rendering;
 
 namespace CGFinal.Helpers {
     // avoid collision with other classes
     public static class ComputeHelper
     {
+        public static void Dispatch(ComputeShader shader, int numIterationsX, int numIterationsY, int numIterationsZ, int kernelIndex) {
+            Vector3Int threadGroupsSizes = GetThreadGroupSizes(shader, kernelIndex);
+            int threadGroupX = Mathf.CeilToInt(numIterationsX / (float)threadGroupsSizes.x);
+            int threadGroupY = Mathf.CeilToInt(numIterationsY / (float)threadGroupsSizes.y);
+            int threadGroupZ = Mathf.CeilToInt(numIterationsZ / (float)threadGroupsSizes.z);
+
+            shader.Dispatch(kernelIndex, threadGroupX, threadGroupY, threadGroupZ);
+        }
         public static void Dispatch(ComputeShader shader, int numIterationsX, int kernelIndex) {
             Vector3Int threadGroupsSizes = GetThreadGroupSizes(shader, kernelIndex);
             int threadGroupX = Mathf.CeilToInt(numIterationsX / (float)threadGroupsSizes.x);
@@ -82,6 +89,23 @@ namespace CGFinal.Helpers {
                     buffer.Release();
                 }
             }
+        }
+
+        public static void CreateRenderTexture3D(ref RenderTexture texture, int width, int height, int depth, GraphicsFormat format = GraphicsFormat.R32G32B32A32_SFloat
+                                                TextureWrapMode wrapMode = TextureWrapMode.Repeat, bool useMipMap = false, string name = "RenderTexture3D") {
+            if (texture != null) {
+                texture.Release();
+            }
+            texture = new RenderTexture(width, height, depth, format);
+            texture.enableRandomWrite = true;
+            texture.autoGenerateMips = false;
+            texture.volumeDepth = depth;
+            texture.dimension = TextureDimension.Tex3D;
+            texture.Create();
+            texture.wrapMode = wrapMode;
+            texture.filterMode = FilterMode.Bilinear;
+            texture.useMipMap = useMipMap;
+            texture.name = name;
         }
     }
 }

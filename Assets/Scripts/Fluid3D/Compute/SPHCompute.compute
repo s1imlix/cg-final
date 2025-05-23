@@ -5,7 +5,7 @@
 #pragma kernel calcPressureForce // 3
 #pragma kernel calcViscosityForce // 4
 #pragma kernel UpdateSpatialHash // 5
-#pragma kernel calcDensityPos
+#pragma kernel calcDensityTexture // 6
 
 
 #include "./SmoothingKernel.hlsl"
@@ -26,9 +26,8 @@ const uint numParticles;
 
 RWStructuredBuffer<uint3> _SpatialLookupBuffer;
 RWStructuredBuffer<uint> _startIndicesBuffer;
-RWStructuredBuffer<float3> _QueryPositions;
-RWStructuredBuffer<float> _DensityResults;
-const uint numQueryPositions;
+RWTexture3D<float> DensityTex;
+const int3 DensityTexSize;
 
 // RWStructuredBuffer<uint> _DebugBuffer;
 
@@ -243,17 +242,14 @@ void UpdateSpatialHash(uint3 id : SV_DispatchThreadID) {
     // Sorting will be handled by GPU, see BitonicMergeSort.compute
 }
 
-[numthreads(NumThreads, 1, 1)]
-void calcDensityPos(uint3 id : SV_DispatchThreadID) {
-    if (id.x >= numQueryPositions) return;
-    float3 queryPosition = _QueryPositions[id.x];
+void calcDensityAtPos(float3 queryPosition) {
+
     int3 centerCell = PositionToCell3D(queryPosition, radius);
     float density = 0.0;
     for (int i = 0; i < 27; i++) {
         uint cellHash = HashCell3D(centerCell + inRadCellOffset[i]);
         uint cellKey = KeyFromHash(cellHash, numParticles);
         uint currIndex = _startIndicesBuffer[cellKey];
-        
         while (currIndex < numParticles) {
             uint3 currParticleLookup = _SpatialLookupBuffer[currIndex++];
             if (currParticleLookup[2] != cellKey) break; 
@@ -269,5 +265,16 @@ void calcDensityPos(uint3 id : SV_DispatchThreadID) {
             density += SpikyKernelPow2(distance, radius);
         }
     }
-    _DensityResults[id.x] = density;
+    return density;
 }
+
+[numthreads(8,8,8)]
+void calcDensityTexture(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= DensityTexSize.x ||
+        id.y >= DensityTexSize.y ||
+        id.z >= DensityTexSize.z) return;
+    float3 texPos = id / (DensityTexSize - 1); // component-wise division
+    float3 worldPos = (texPos - 0.5) * 2.0 * halfBoxScale; // scale to world space
+    DensityTex[id] = calcDensityAtPos(worldPos);
+}
+

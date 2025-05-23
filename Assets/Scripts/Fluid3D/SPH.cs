@@ -75,11 +75,12 @@ public class SPH : MonoBehaviour
     const int ExternalGravity = 0;
     const int UpdatePositions = 1;
 
-    public const int calcDensity = 2;
+    const int calcDensity = 2;
     const int calcPressureForce = 3;
     const int calcViscosityForce = 4;
     const int UpdateSpatialHash = 5;
-    public const int calcDensityPos = 6;
+    
+    const int calcDensityTexture = 6;
 
     GPUSort gpuBMS;
     public ComputeBuffer _spatialLookupBuffer;
@@ -87,6 +88,8 @@ public class SPH : MonoBehaviour
 
     public ComputeBuffer _queryPosBuffer;
     public ComputeBuffer _densityResultsBuffer;
+
+    [HideInInspector] public RenderTexture DensityTexture;
 
     // private ComputeBuffer _debug;
     // private uint[] _debugInit = new uint[1]{0};
@@ -158,11 +161,11 @@ public class SPH : MonoBehaviour
         _spatialLookupBuffer = ComputeHelper.CreateStructBuffer<Entry>(_particleCount);
         _startIndicesBuffer = ComputeHelper.CreateStructBuffer<uint>(_particleCount);
          ComputeHelper.SetBuffer(computeShader, _particleBuffer, "_ParticleBuffer", 
-                                ExternalGravity, UpdatePositions, calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash, calcDensityPos);
+                                ExternalGravity, UpdatePositions, calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash, calcDensityTexture);
         ComputeHelper.SetBuffer(computeShader, _spatialLookupBuffer, "_SpatialLookupBuffer",
-                                calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash, calcDensityPos);
+                                calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash, calcDensityTexture);
         ComputeHelper.SetBuffer(computeShader, _startIndicesBuffer, "_startIndicesBuffer",
-                                calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash, calcDensityPos);
+                                calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash, calcDensityTexture);
         // ComputeHelper.SetBuffer(computeShader, _debug, "_DebugBuffer", calcPressureForce);
         gpuBMS = new();
         gpuBMS.SetBuffers(_spatialLookupBuffer, _startIndicesBuffer);   
@@ -180,7 +183,7 @@ public class SPH : MonoBehaviour
 
         for (int i = 0; i<iterationPerFrame; i++) {
             Simulate();
-            onSimulationComplete?.Invoke(); // Sample for marchingCube algorithm
+            // onSimulationComplete?.Invoke();
         }
     }
 
@@ -228,7 +231,21 @@ public class SPH : MonoBehaviour
             isPaused = true;
         }
 
+        if (marchingCubeRenderer.isRendering) {
+            UpdateDensityTexture();
+        }
+
         HandleInput();
+    }
+
+    void UpdateDensityTexture() {
+        float maxAxis = Mathf.Max(transform.localScale.x, transform.localScale.y, transform.localScale.z);
+        int nx = Mathf.CeilToInt(transform.localScale.x / maxAxis * marchingCubeRenderer.Resolution);
+        int ny = Mathf.CeilToInt(transform.localScale.y / maxAxis * marchingCubeRenderer.Resolution);
+        int nz = Mathf.CeilToInt(transform.localScale.z / maxAxis * marchingCubeRenderer.Resolution);
+        ComputeHelper.CreateRenderTexture3D(ref DensityTexture, nx, ny, nz, UnityEngine.Experimental.Rendering.GraphicsFormat.R16_SFloat, TextureWrapMode.Clamp, false, "DensityTexture");
+        computeShader.SetTexture(calcDensityTexture, "DensityTex", DensityTexture);
+        ComputeHelper.Dispatch(computeShader, nx, ny, nz, calcDensityTexture);
     }
 
     void HandleInput()
