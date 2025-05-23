@@ -1,5 +1,27 @@
 #pragma kernel calcDensity
 
+#include "./SmoothingKernel.hlsl"
+#include "./SpatialHash.hlsl"
+
+struct Particle
+{
+    float3 position;
+    float3 velocity;
+    float3 predictPosition;
+    float density;
+    float nearDensity;
+};
+
+RWStructuredBuffer<Particle> _ParticleBuffer;
+StructuredBuffer<uint3> _SpatialLookupBuffer;
+StructuredBuffer<uint> _startIndicesBuffer;
+
+const uint numParticles;
+const float radius = 1.0;
+const float squaredRadius;
+
+static const uint NumThreads = 64;
+
 [numthreads(NumThreads, 1, 1)]
 void calcDensity(uint3 id : SV_DispatchThreadID) {
     // based on formula 3

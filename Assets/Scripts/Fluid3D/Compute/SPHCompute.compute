@@ -5,6 +5,7 @@
 #pragma kernel calcPressureForce // 3
 #pragma kernel calcViscosityForce // 4
 #pragma kernel UpdateSpatialHash // 5
+#pragma kernel calcDensityPos
 
 
 #include "./SmoothingKernel.hlsl"
@@ -25,6 +26,10 @@ const uint numParticles;
 
 RWStructuredBuffer<uint3> _SpatialLookupBuffer;
 RWStructuredBuffer<uint> _startIndicesBuffer;
+RWStructuredBuffer<float3> _QueryPositions;
+RWStructuredBuffer<float> _DensityResults;
+const uint numQueryPositions;
+
 // RWStructuredBuffer<uint> _DebugBuffer;
 
 float _DeltaTime;
@@ -238,3 +243,33 @@ void UpdateSpatialHash(uint3 id : SV_DispatchThreadID) {
     // Sorting will be handled by GPU, see BitonicMergeSort.compute
 }
 
+[numthreads(NumThreads, 1, 1)]
+void calcDensityPos(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= numQueryPositions) return;
+    float3 queryPosition = _QueryPositions[id.x];
+    int3 centerCell = PositionToCell3D(queryPosition, radius);
+    float density = 0.0;
+    float nearDensity = 0.0;
+    for (int i = 0; i < 27; i++) {
+        uint cellHash = HashCell3D(centerCell + inRadCellOffset[i]);
+        uint cellKey = KeyFromHash(cellHash, numParticles);
+        uint currIndex = _startIndicesBuffer[cellKey];
+        
+        while (currIndex < numParticles) {
+            uint3 currParticleLookup = _SpatialLookupBuffer[currIndex++];
+            if (currParticleLookup[2] != cellKey) break; 
+            if (currParticleLookup[1] != cellHash) continue; 
+            
+            uint particleIndex = currParticleLookup[0];
+            Particle particle = _ParticleBuffer[particleIndex];
+            float3 diff = queryPosition - particle.predictPosition;
+            float distanceSquared = dot(diff, diff);
+            
+            if (distanceSquared > squaredRadius) continue; 
+            float distance = sqrt(distanceSquared);
+            density += SpikyKernelPow2(distance, radius);
+            nearDensity += SpikyKernelPow3(distance, radius);
+        }
+    }
+    _DensityResults[id.x] = density;
+}

@@ -79,10 +79,16 @@ public class SPH : MonoBehaviour
     const int calcPressureForce = 3;
     const int calcViscosityForce = 4;
     const int UpdateSpatialHash = 5;
+    const int calcDensityPos = 6;
 
     GPUSort gpuBMS;
     public ComputeBuffer _spatialLookupBuffer;
     public ComputeBuffer _startIndicesBuffer;
+
+    public ComputeBuffer _queryPosBuffer;
+    public ComputeBuffer _densityResultsBuffer;
+    private Vector3[] _queryPositions;
+    private float[] _densityResults;
 
     // private ComputeBuffer _debug;
     // private uint[] _debugInit = new uint[1]{0};
@@ -154,11 +160,11 @@ public class SPH : MonoBehaviour
         _spatialLookupBuffer = ComputeHelper.CreateStructBuffer<Entry>(_particleCount);
         _startIndicesBuffer = ComputeHelper.CreateStructBuffer<uint>(_particleCount);
          ComputeHelper.SetBuffer(computeShader, _particleBuffer, "_ParticleBuffer", 
-                                ExternalGravity, UpdatePositions, calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash);
+                                ExternalGravity, UpdatePositions, calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash, calcDensityPos);
         ComputeHelper.SetBuffer(computeShader, _spatialLookupBuffer, "_SpatialLookupBuffer",
-                                calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash);
+                                calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash, calcDensityPos);
         ComputeHelper.SetBuffer(computeShader, _startIndicesBuffer, "_startIndicesBuffer",
-                                calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash);
+                                calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash, calcDensityPos);
         // ComputeHelper.SetBuffer(computeShader, _debug, "_DebugBuffer", calcPressureForce);
         gpuBMS = new();
         gpuBMS.SetBuffers(_spatialLookupBuffer, _startIndicesBuffer);   
@@ -286,7 +292,7 @@ public class SPH : MonoBehaviour
     }
 
     void OnDestroy(){
-        ComputeHelper.Release(_particleBuffer, _spatialLookupBuffer, _startIndicesBuffer);
+        ComputeHelper.Release(_particleBuffer, _spatialLookupBuffer, _startIndicesBuffer, _queryPosBuffer, _densityResultsBuffer);
     }
 
 }
