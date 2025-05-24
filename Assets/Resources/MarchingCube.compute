@@ -5,6 +5,7 @@
 
 Texture3D<float> DensityTex;
 RWStructuredBuffer<int> edgeLUT;
+// RWStructuredBuffer<int> TriCount;
 AppendStructuredBuffer<Triangle> OutputBuffer; // Assuming you have a structured buffer to store the output vertices
 uint3 DensityTexSize;
 const float3 localScale; // scale of the volume in world space
@@ -57,7 +58,7 @@ Vertex InterpolateVertex(int3 coordA, int3 coordB) {
     float t = (IsoValue - d1) / (d2 - d1);
     
     Vertex v; // interpolated vertex where mesh intersects
-    v.position = lerp(v1Pos, v2Pos, t);
+    v.position = lerp(v1Pos, v2Pos, t) * localScale; // scale to world space
 
     /*
     Wiki: The gradient of the scalar field at each grid point is also the normal vector 
@@ -79,9 +80,11 @@ void MarchCube(int3 id : SV_DispatchThreadID) {
     */
 
     int3 numCubes = DensityTexSize - 1; // number of cubes in each dimension
+     // ensure TriCount is initialized
     if (id.x >= numCubes.x || id.y >= numCubes.y || id.z >= numCubes.z) {
         return; // edges no cube
     }
+    
 
     int3 cubeCornerCoords[8];
     float coordDensities[8];

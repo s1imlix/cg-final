@@ -70,9 +70,21 @@ namespace CGFinal.Helpers {
             T[] data = new T[count];
             buffer.GetData(data);
             for (int i = 0; i < count; i++) {
-                Debug.Log($"DebugStructBuffer: {i} -> {data[i]}");
+                Debug.Log($"DebugStructBuffer: buf[{i}] -> {data[i]}");
             }
             return data;
+        }
+
+        public static void DebugAppendBuffer<T>(ComputeBuffer buffer) {
+            if (buffer == null || !buffer.IsValid()) {
+                Debug.LogWarning("DebugAppendBuffer: Buffer is null or invalid.");
+                return;
+            }
+            ComputeBuffer countbuffer = new ComputeBuffer(1, sizeof(int), ComputeBufferType.Raw);
+            ComputeBuffer.CopyCount(buffer, countbuffer, 0);
+            int[] countArray = new int[1];
+            countbuffer.GetData(countArray);
+            Debug.Log($"DebugAppendBuffer: Count = {countArray[0]}");
         }
 
         public static void SetBuffer(ComputeShader shader, ComputeBuffer buffer, string name, params int[] kernelIndices) {
@@ -109,20 +121,17 @@ namespace CGFinal.Helpers {
             if (texture != null) {
                 texture.Release();
             }
-            
             texture = new RenderTexture(width, height, 0, format);
             texture.enableRandomWrite = true;
             texture.autoGenerateMips = false;
+            texture.volumeDepth = depth;
             texture.dimension = TextureDimension.Tex3D;
-            texture.volumeDepth = depth;  // Set the Z-dimension here
+            texture.useMipMap = useMipMap;
+            texture.Create();
             texture.wrapMode = wrapMode;
             texture.filterMode = FilterMode.Bilinear;
-            texture.useMipMap = useMipMap;
             texture.name = name;
-            texture.Create();
         }
-
-        
     }
 }
 

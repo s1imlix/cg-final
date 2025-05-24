@@ -130,6 +130,7 @@ GameObject:
   - component: {fileID: 635261036}
   - component: {fileID: 635261035}
   - component: {fileID: 635261037}
+  - component: {fileID: 635261038}
   m_Layer: 0
   m_Name: FluidSimulator
   m_TagString: Untagged
@@ -149,7 +150,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7da0ff73bd2cc9c998612982aabff1e7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  MAX_PARTICLES: 40000
+  MAX_PARTICLES: 30000
   pauseNextFrame: 1
   showBoundingBox: 0
   iterationPerFrame: 1
@@ -163,12 +164,12 @@ MonoBehaviour:
   viscosityStrength: 0.09
   collisionDamping: 0.1
   numToSpawn: {x: 10000, y: 100, z: 100}
-  spawnBasePosition: {x: 0, y: 5, z: 0}
+  spawnBasePosition: {x: 0, y: 0, z: 0}
   useParentPosition: 1
   jitLength: 0.5
   initVelocity: {x: 0, y: 0.2, z: 0}
   particleRenderer: {fileID: 635261037}
-  marchingCubeRenderer: {fileID: 0}
+  marchingCubeRenderer: {fileID: 635261038}
   onSimulationComplete:
     m_PersistentCalls:
       m_Calls: []
@@ -183,9 +184,9 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 635261034}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 5, z: 0}
-  m_LocalScale: {x: 3, y: 2, z: 4}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 4, y: 1.5, z: 4}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -238,6 +239,23 @@ MonoBehaviour:
     m_NumColorKeys: 5
     m_NumAlphaKeys: 2
   maxGradientVelocity: 50
+--- !u!114 &635261038
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 635261034}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c446ccadb30a501dbb79d67b3a1ea22, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  marchingCubeMaterial: {fileID: 2100000, guid: 85abbc2f853b6f08587178d7973148a8, type: 2}
+  isRendering: 1
+  debugTriCount: 1
+  Resolution: 50
+  isoLevel: 25
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
@@ -420,9 +438,9 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.13052616, y: 0, z: 0, w: 0.9914449}
-  m_LocalPosition: {x: 0, y: 7, z: -9}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalRotation: {x: 0.13052616, y: -0, z: -0, w: 0.9914449}
+  m_LocalPosition: {x: 0, y: 4, z: -17}
+  m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -431,6 +449,6 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 963194228}
   - {fileID: 705507995}
+  - {fileID: 963194228}
   - {fileID: 635261036}

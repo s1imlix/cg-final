@@ -85,8 +85,7 @@ public class SPH : MonoBehaviour
     GPUSort gpuBMS;
     public ComputeBuffer _spatialLookupBuffer;
     public ComputeBuffer _startIndicesBuffer;
-
-
+    // public ComputeBuffer debugDensityBuffer;
 
     [HideInInspector] public RenderTexture DensityTexture;
 
@@ -159,12 +158,14 @@ public class SPH : MonoBehaviour
         _particleBuffer = ComputeHelper.CreateStructBuffer(particles); 
         _spatialLookupBuffer = ComputeHelper.CreateStructBuffer<Entry>(_particleCount);
         _startIndicesBuffer = ComputeHelper.CreateStructBuffer<uint>(_particleCount);
+        // debugDensityBuffer = ComputeHelper.CreateStructBuffer<float>(1);
          ComputeHelper.SetBuffer(computeShader, _particleBuffer, "_ParticleBuffer", 
                                 ExternalGravity, UpdatePositions, calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash, calcDensityTexture);
         ComputeHelper.SetBuffer(computeShader, _spatialLookupBuffer, "_SpatialLookupBuffer",
                                 calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash, calcDensityTexture);
         ComputeHelper.SetBuffer(computeShader, _startIndicesBuffer, "_startIndicesBuffer",
                                 calcDensity, calcPressureForce, calcViscosityForce, UpdateSpatialHash, calcDensityTexture);
+        // ComputeHelper.SetBuffer(computeShader, debugDensityBuffer, "debugDensityBuffer", calcDensityTexture);
         // ComputeHelper.SetBuffer(computeShader, _debug, "_DebugBuffer", calcPressureForce);
         gpuBMS = new();
         gpuBMS.SetBuffers(_spatialLookupBuffer, _startIndicesBuffer);   
@@ -184,6 +185,7 @@ public class SPH : MonoBehaviour
             Simulate();
             // onSimulationComplete?.Invoke();
         }
+        if (marchingCubeRenderer.isRendering) UpdateDensityTexture();
     }
 
     void UpdateSettings(float timeStep) {
@@ -230,10 +232,6 @@ public class SPH : MonoBehaviour
             isPaused = true;
         }
 
-        if (marchingCubeRenderer.isRendering) {
-            UpdateDensityTexture();
-        }
-
         HandleInput();
     }
 
@@ -244,7 +242,10 @@ public class SPH : MonoBehaviour
         int nz = Mathf.CeilToInt(transform.localScale.z / maxAxis * marchingCubeRenderer.Resolution);
         ComputeHelper.CreateRenderTexture3D(ref DensityTexture, nx, ny, nz, UnityEngine.Experimental.Rendering.GraphicsFormat.R16_SFloat, TextureWrapMode.Clamp, false, "DensityTexture");
         computeShader.SetTexture(calcDensityTexture, "DensityTex", DensityTexture);
+        computeShader.SetInts("DensityTexSize", nx, ny, nz);
+        // Debug.Log($"Density texture size: {nx}x{ny}x{nz}");
         ComputeHelper.Dispatch(computeShader, nx, ny, nz, calcDensityTexture);
+        // Debug.Log($"Last density computed: {ComputeHelper.DebugStructBuffer<float>(debugDensityBuffer, 1)[0]}");
     }
 
     void HandleInput()
