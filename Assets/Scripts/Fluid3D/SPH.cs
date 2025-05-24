@@ -86,8 +86,7 @@ public class SPH : MonoBehaviour
     public ComputeBuffer _spatialLookupBuffer;
     public ComputeBuffer _startIndicesBuffer;
 
-    public ComputeBuffer _queryPosBuffer;
-    public ComputeBuffer _densityResultsBuffer;
+
 
     [HideInInspector] public RenderTexture DensityTexture;
 
@@ -307,7 +306,7 @@ public class SPH : MonoBehaviour
     }
 
     void OnDestroy(){
-        ComputeHelper.Release(_particleBuffer, _spatialLookupBuffer, _startIndicesBuffer, _queryPosBuffer, _densityResultsBuffer);
+        ComputeHelper.Release(_particleBuffer, _spatialLookupBuffer, _startIndicesBuffer);
     }
 
 }

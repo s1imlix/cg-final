@@ -30,6 +30,7 @@ public class MarchingCubeRenderer : MonoBehaviour
     private SPH sphSystem;
     private ComputeShader marchingCubeComputeShader;
     private ComputeBuffer edgeLUTBuffer;
+    private ComputeBuffer vertexBuffer;
 
     private ComputeBuffer renderArgs;
     ComputeBuffer triangleBuffer;

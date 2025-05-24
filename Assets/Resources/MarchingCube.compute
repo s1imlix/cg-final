@@ -33,7 +33,7 @@ float SampleDensityFromTexture(uint3 pos) {
     return DensityTex.SampleLevel(LinearClamp, xyz, 0);
 }
 
-float calculateNormal(uint3 pos) {
+float3 calculateNormal(uint3 pos) {
     // Calculate the gradient of the density field at the given position
     // Using central difference to approximate the gradient
 
@@ -93,9 +93,9 @@ void MarchCube(int3 id : SV_DispatchThreadID) {
 
     // Calculate the index of the cube in the lookup table
     int cubeConfigurationIndex = 0;
-    for (int i = 0; i < 8; i++) {
-        if (coordDensities[i] < IsoValue) {
-            cubeConfigurationIndex |= (1 << i); // set the bit if density is below iso value
+    for (int j = 0; j < 8; j++) {
+        if (coordDensities[j] < IsoValue) {
+            cubeConfigurationIndex |= (1 << j); // set the bit if density is below iso value
         }
     }
 
@@ -103,11 +103,11 @@ void MarchCube(int3 id : SV_DispatchThreadID) {
     int offset = offsetLUT[cubeConfigurationIndex];
     // look into edgeLUT to get the edges that each triangle intersects
 
-    for (int i = 0; i<numTriangles; i++) {
+    for (int k = 0; k<numTriangles; k++) {
         // For each triangle in the cube configuration, interpolate the vertices
-        int2 edgeA = vertexIndexFromEdge[edgeLUT[offset + i * 3]];
-        int2 edgeB = vertexIndexFromEdge[edgeLUT[offset + i * 3 + 1]];
-        int2 edgeC = vertexIndexFromEdge[edgeLUT[offset + i * 3 + 2]];
+        int2 edgeA = vertexIndexFromEdge[edgeLUT[offset + k * 3]];
+        int2 edgeB = vertexIndexFromEdge[edgeLUT[offset + k * 3 + 1]];
+        int2 edgeC = vertexIndexFromEdge[edgeLUT[offset + k * 3 + 2]];
         Vertex vA = InterpolateVertex(cubeCornerCoords[edgeA.x], cubeCornerCoords[edgeA.y]);
         Vertex vB = InterpolateVertex(cubeCornerCoords[edgeB.x], cubeCornerCoords[edgeB.y]);
         Vertex vC = InterpolateVertex(cubeCornerCoords[edgeC.x], cubeCornerCoords[edgeC.y]);

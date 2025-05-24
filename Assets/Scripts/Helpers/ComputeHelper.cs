@@ -109,16 +109,17 @@ namespace CGFinal.Helpers {
             if (texture != null) {
                 texture.Release();
             }
-            texture = new RenderTexture(width, height, depth, format);
+            
+            texture = new RenderTexture(width, height, 0, format);
             texture.enableRandomWrite = true;
             texture.autoGenerateMips = false;
-            texture.volumeDepth = depth;
             texture.dimension = TextureDimension.Tex3D;
-            texture.Create();
+            texture.volumeDepth = depth;  // Set the Z-dimension here
             texture.wrapMode = wrapMode;
             texture.filterMode = FilterMode.Bilinear;
             texture.useMipMap = useMipMap;
             texture.name = name;
+            texture.Create();
         }
 
         
