@@ -238,13 +238,38 @@ public class SPH : MonoBehaviour
     }
 
     void UpdateDensityTexture() {
+        ComputeHelper.Dispatch(computeShader, _particleCount, UpdateSpatialHash); 
+        gpuBMS.SortAndCalculateOffsets();
+        
+        
+        // Debug actual particle positions from GPU buffer
+        // Particle[] currentParticles = new Particle[Mathf.Min(5, _particleCount)];
+        // _particleBuffer.GetData(currentParticles, 0, 0, currentParticles.Length);
+        
+        // for (int i = 0; i < currentParticles.Length; i++) {
+        //     Debug.Log($"Particle {i} GPU position: {currentParticles[i].position}, density: {currentParticles[i].density}");
+            
+        //     // Check if particle is within the FULL local bounds [-scale/2, scale/2]
+        //     Vector3 localPos = transform.InverseTransformPoint(currentParticles[i].position);
+        //     Vector3 halfScale = transform.localScale * 0.5f;
+        //     bool inBounds = Mathf.Abs(localPos.x) <= halfScale.x && 
+        //                    Mathf.Abs(localPos.y) <= halfScale.y && 
+        //                    Mathf.Abs(localPos.z) <= halfScale.z;
+        //     Debug.Log($"Particle {i} local position: {localPos}, in bounds: {inBounds}, halfScale: {halfScale}");
+        // }
+        
         float maxAxis = Mathf.Max(transform.localScale.x, transform.localScale.y, transform.localScale.z);
         int nx = Mathf.CeilToInt(transform.localScale.x / maxAxis * marchingCubeRenderer.Resolution);
         int ny = Mathf.CeilToInt(transform.localScale.y / maxAxis * marchingCubeRenderer.Resolution);
         int nz = Mathf.CeilToInt(transform.localScale.z / maxAxis * marchingCubeRenderer.Resolution);
         ComputeHelper.CreateRenderTexture3D(ref DensityTexture, nx, ny, nz, UnityEngine.Experimental.Rendering.GraphicsFormat.R16_SFloat, TextureWrapMode.Clamp, false, "DensityTexture");
+        computeShader.SetInts("DensityTexSize", nx, ny, nz);
         computeShader.SetTexture(calcDensityTexture, "DensityTex", DensityTexture);
-        ComputeHelper.Dispatch(computeShader, nx, ny, nz, calcDensityTexture);
+        
+        int groupX = Mathf.CeilToInt(nx / 8.0f);
+        int groupY = Mathf.CeilToInt(ny / 8.0f);
+        int groupZ = Mathf.CeilToInt(nz / 8.0f);
+        computeShader.Dispatch(calcDensityTexture, groupX, groupY, groupZ);
     }
 
     void HandleInput()

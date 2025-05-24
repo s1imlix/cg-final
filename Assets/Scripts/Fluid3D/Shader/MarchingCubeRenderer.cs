@@ -78,18 +78,26 @@ public class MarchingCubeRenderer : MonoBehaviour
         // Update variables
         marchingCubeComputeShader.SetBuffer(MarchCube, "edgeLUT", edgeLUTBuffer);
         marchingCubeComputeShader.SetBuffer(MarchCube, "OutputBuffer", triangleBuffer);
+        marchingCubeComputeShader.SetBuffer(UpdateRenderArgs, "OutputBuffer", triangleBuffer);
         marchingCubeComputeShader.SetTexture(MarchCube, "DensityTex", sphSystem.DensityTexture);
         marchingCubeComputeShader.SetInts("DensityTexSize", sphSystem.DensityTexture.width, sphSystem.DensityTexture.height, sphSystem.DensityTexture.depth);
         marchingCubeComputeShader.SetFloat("IsoValue", isoLevel);
         marchingCubeComputeShader.SetVector("localScale", sphSystem.transform.localScale);
+
+        //Debug.Log($"Resolution: {Resolution}, Texture size: {sphSystem.DensityTexture.width}x{sphSystem.DensityTexture.height}x{sphSystem.DensityTexture.depth}, IsoLevel: {isoLevel}");
     }
 
     void RenderFluid() {
         // Launch marching cube compute shader
         UpdateMarchingCubeSettings();
-        marchingCubeMaterial.SetBuffer("VertexBuffer", triangleBuffer);
-
-        // (triangle index count, instance count, sub-mesh index, base vertex index, byte offset)
+        
+        int numCubePerAxis = Resolution - 1;
+        int groupX = Mathf.CeilToInt(numCubePerAxis / 8.0f);
+        int groupY = Mathf.CeilToInt(numCubePerAxis / 8.0f);
+        int groupZ = Mathf.CeilToInt(numCubePerAxis / 8.0f);
+        
+        marchingCubeComputeShader.Dispatch(MarchCube, groupX, groupY, groupZ);
+        
         ComputeBuffer.CopyCount(triangleBuffer, renderArgs, 0);
         marchingCubeComputeShader.Dispatch(UpdateRenderArgs, 1, 1, 1);
 

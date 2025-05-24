@@ -41,7 +41,7 @@ const float4x4 worldToLocal;
 static const uint NumThreads = 64; 
 const float mass = 1.0;
 const float radius = 1.0; 
-const float squaredRadius;
+const float squaredRadius = 1.0; // for now
 const float targetDensity = 1000.0; 
 const float pressureMultiplier = 1; 
 const float ngbPressureMultiplier = 1; 
@@ -273,8 +273,11 @@ void calcDensityTexture(uint3 id : SV_DispatchThreadID) {
     if (id.x >= DensityTexSize.x ||
         id.y >= DensityTexSize.y ||
         id.z >= DensityTexSize.z) return;
-    float3 texPos = id / (DensityTexSize - 1); // component-wise division
-    float3 worldPos = (texPos - 0.5) * 2.0 * halfBoxScale; // scale to world space
+        
+    float3 texPos = (float3)id / (float3)(DensityTexSize - 1);
+    float3 localPos = (texPos - 0.5) * 2.0 * halfBoxScale;
+    float3 worldPos = mul(localToWorld, float4(localPos, 1.0)).xyz;
+    
     DensityTex[id] = calcDensityAtPos(worldPos);
 }
 
