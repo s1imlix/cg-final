@@ -151,6 +151,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   MAX_PARTICLES: 40000
   pauseNextFrame: 1
+  showBoundingBox: 0
   iterationPerFrame: 1
   timeScale: 0.1
   gravity: {x: 0, y: -9.8, z: 0}
@@ -167,11 +168,13 @@ MonoBehaviour:
   jitLength: 0.5
   initVelocity: {x: 0, y: 0.2, z: 0}
   particleRenderer: {fileID: 635261037}
+  marchingCubeRenderer: {fileID: 0}
   onSimulationComplete:
     m_PersistentCalls:
       m_Calls: []
   computeShader: {fileID: 7200000, guid: e61dc2148a498465b923d42cce2d8176, type: 3}
   particles: []
+  DensityTexture: {fileID: 0}
 --- !u!4 &635261036
 Transform:
   m_ObjectHideFlags: 0

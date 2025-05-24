@@ -36,6 +36,19 @@ namespace CGFinal.Helpers {
             return buffer;
         }
 
+        public static void CreateAppendBuffer<T>(ref ComputeBuffer buffer, int count)
+		{
+			int stride = GetStride<T>();
+			bool createNewBuffer = (buffer == null || !buffer.IsValid() || buffer.count != count || buffer.stride != stride);
+			if (createNewBuffer)
+			{
+				Release(buffer);
+				buffer = new ComputeBuffer(count, stride, ComputeBufferType.Append);
+			}
+
+			buffer.SetCounterValue(0);
+		}
+
         public static GraphicsBuffer CreateArgsBuffer(Mesh particleMesh, int numInstances) {
             GraphicsBuffer _argsBuffer 
                 = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 
@@ -91,7 +104,7 @@ namespace CGFinal.Helpers {
             }
         }
 
-        public static void CreateRenderTexture3D(ref RenderTexture texture, int width, int height, int depth, GraphicsFormat format = GraphicsFormat.R32G32B32A32_SFloat
+        public static void CreateRenderTexture3D(ref RenderTexture texture, int width, int height, int depth, GraphicsFormat format = GraphicsFormat.R32G32B32A32_SFloat,
                                                 TextureWrapMode wrapMode = TextureWrapMode.Repeat, bool useMipMap = false, string name = "RenderTexture3D") {
             if (texture != null) {
                 texture.Release();
@@ -107,6 +120,8 @@ namespace CGFinal.Helpers {
             texture.useMipMap = useMipMap;
             texture.name = name;
         }
+
+        
     }
 }
 
