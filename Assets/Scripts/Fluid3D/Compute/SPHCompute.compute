@@ -242,7 +242,7 @@ void UpdateSpatialHash(uint3 id : SV_DispatchThreadID) {
     // Sorting will be handled by GPU, see BitonicMergeSort.compute
 }
 
-void calcDensityAtPos(float3 queryPosition) {
+float calcDensityAtPos(float3 queryPosition) {
 
     int3 centerCell = PositionToCell3D(queryPosition, radius);
     float density = 0.0;

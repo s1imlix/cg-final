@@ -26,14 +26,17 @@ public class MarchingCubeRenderer : MonoBehaviour
     public bool isRendering;
     public int Resolution;
 
-    [SerializeField] private bool needUpdate = true; // set this whenever numSamples changes
     public float isoLevel = 0.5f;
     private SPH sphSystem;
     private ComputeShader marchingCubeComputeShader;
     private ComputeBuffer edgeLUTBuffer;
+
+    private ComputeBuffer renderArgs;
     ComputeBuffer triangleBuffer;
 
+    private Bounds bounds = new Bounds(Vector3.zero, Vector3.one * 100f);
     private const int MarchCube = 0;
+    private const int UpdateRenderArgs = 1; 
     const uint maxBytes = 2147483648; // 2GB
     
 
@@ -41,9 +44,11 @@ public class MarchingCubeRenderer : MonoBehaviour
     {
         sphSystem = sph;
         marchingCubeComputeShader = Resources.Load<ComputeShader>("MarchingCube");
-        string lut = Resources.Load<TextAsset>("MarchingCubeEdgeLUT").text;
+        string lut = Resources.Load<TextAsset>("MarchingCubeLUT").text;
         int[] edgeLUT = lut.Trim().Split(',').Select(x => int.Parse(x)).ToArray();
         edgeLUTBuffer = ComputeHelper.CreateStructBuffer(edgeLUT);
+        renderArgs = new ComputeBuffer(5, sizeof(uint), ComputeBufferType.IndirectArguments);
+        ComputeHelper.SetBuffer(marchingCubeComputeShader, renderArgs, "RenderArgs", UpdateRenderArgs);
     }
 
     void LateUpdate()
@@ -80,12 +85,20 @@ public class MarchingCubeRenderer : MonoBehaviour
 
     void RenderFluid() {
         // Launch marching cube compute shader
-        
+        UpdateMarchingCubeSettings();
+        marchingCubeMaterial.SetBuffer("VertexBuffer", triangleBuffer);
+
+        // (triangle index count, instance count, sub-mesh index, base vertex index, byte offset)
+        ComputeBuffer.CopyCount(triangleBuffer, renderArgs, 0);
+        marchingCubeComputeShader.Dispatch(UpdateRenderArgs, 1, 1, 1);
+
+        Graphics.DrawProceduralIndirect(marchingCubeMaterial, bounds, MeshTopology.Triangles, renderArgs);
     }
+
 
     void OnDestroy()
     {
-
+        ComputeHelper.Release(edgeLUTBuffer, renderArgs, triangleBuffer);
     }
 
 }

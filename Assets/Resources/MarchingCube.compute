@@ -1,4 +1,5 @@
 #pragma kernel MarchCube
+#pragma kernel UpdateRenderArgs
 
 #include "MarchingCubeHelpers.hlsl"
 
@@ -12,11 +13,24 @@ const float IsoValue;
 
 SamplerState LinearClamp;
 
-
+RWStructuredBuffer<int> RenderArgs; // Buffer to store render arguments, e.g., number of triangles
 
 float3 TextureCoordToPos(uint3 coord) { 
     // TextureCoord [x, y, z] to normalized [-0.5, 0.5] range
     return (coord / (DensityTexSize - 1)) - 0.5f;
+}
+
+
+
+float SampleDensityFromTexture(uint3 pos) {
+    if (any(pos <= 0 || pos >= DensityTexSize - 1)) {
+        return IsoValue; // must be painted
+    }
+
+    float3 xyz = pos / (float3)(DensityTexSize - 1);
+    // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-samplelevel
+    // SampleLevel(tex, sampler, coord: float3)
+    return DensityTex.SampleLevel(LinearClamp, xyz, 0);
 }
 
 float calculateNormal(uint3 pos) {
@@ -28,17 +42,6 @@ float calculateNormal(uint3 pos) {
     float dz = SampleDensityFromTexture(pos + coordOffsets[3]) - SampleDensityFromTexture(pos - coordOffsets[3]);
 
     return normalize(float3(dx, dy, dz));
-}
-
-float SampleDensityFromTexture(uint3 pos) {
-    if (any(pos <= 0 || pos >= DensityTexSize - 1)) {
-        return IsoValue; // must be painted
-    }
-
-    float3 xyz = pos / (float3)(DensityTexSize - 1);
-    // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-samplelevel
-    // SampleLevel(tex, sampler, coord: float3)
-    return DensityTex.SampleLevel(LinearClamp, xyz, 0);
 }
 
 Vertex InterpolateVertex(int3 coordA, int3 coordB) { 
@@ -54,7 +57,7 @@ Vertex InterpolateVertex(int3 coordA, int3 coordB) {
     float t = (IsoValue - d1) / (d2 - d1);
     
     Vertex v; // interpolated vertex where mesh intersects
-    v.pos = lerp(v1Pos, v2Pos, t);
+    v.position = lerp(v1Pos, v2Pos, t);
 
     /*
     Wiki: The gradient of the scalar field at each grid point is also the normal vector 
@@ -84,7 +87,7 @@ void MarchCube(int3 id : SV_DispatchThreadID) {
     float coordDensities[8];
     for (int i = 0; i<8; i++)
     {
-        cubeCornerCoords[i] = id + cubeOffsets[i];
+        cubeCornerCoords[i] = id + coordOffsets[i];
         coordDensities[i] = SampleDensityFromTexture(cubeCornerCoords[i]);
     }
 
@@ -115,6 +118,14 @@ void MarchCube(int3 id : SV_DispatchThreadID) {
         tri.vertexC = vC;
         OutputBuffer.Append(tri);
     }
+}
 
-
+[numthreads(1, 1, 1)]
+void UpdateRenderArgs(uint3 id : SV_DispatchThreadID) {
+    // Update the render arguments for the mesh
+    RenderArgs[0] *= 3; // total number of vertices (3 per triangle)
+    RenderArgs[1] = 1; // one instance of mesh
+    RenderArgs[2] = 0; // no submesh
+    RenderArgs[3] = 0; // base vertex 0 
+    RenderArgs[4] = 0; // byte offset 0
 }
