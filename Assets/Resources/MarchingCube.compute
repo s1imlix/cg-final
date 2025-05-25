@@ -7,38 +7,42 @@ Texture3D<float> DensityTex;
 RWStructuredBuffer<int> edgeLUT;
 // RWStructuredBuffer<int> TriCount;
 AppendStructuredBuffer<Triangle> OutputBuffer; // Assuming you have a structured buffer to store the output vertices
-uint3 DensityTexSize;
+const uint3 DensityTexSize;
 const float3 localScale; // scale of the volume in world space
 
 const float IsoValue;
 
-SamplerState LinearClamp;
+SamplerState linearClampSampler;
 
 RWStructuredBuffer<int> RenderArgs; // Buffer to store render arguments, e.g., number of triangles
 
 float3 TextureCoordToPos(uint3 coord) { 
     // TextureCoord [x, y, z] to normalized [-0.5, 0.5] range
-    return ((float3)coord / (float3)(DensityTexSize - 1) - 0.5f);
+    return (coord / (DensityTexSize - 1.0)) - 0.5f;
 }
 
-float SampleDensityFromTexture(int3 pos) {
-    if (any(pos <= 0 || pos >= (int3)DensityTexSize - 1)) {
+float SampleDensityFromTexture(uint3 pos) {
+    if (any(pos <= 0 || pos >= DensityTexSize - 1)) {
         return IsoValue; // must be painted
     }
 
-    float3 xyz = (float3)pos / (float3)(DensityTexSize - 1);
+    float3 xyz = pos / (float3) (DensityTexSize - 1);
     // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-samplelevel
     // SampleLevel(tex, sampler, coord: float3)
-    return DensityTex.SampleLevel(LinearClamp, xyz, 0);
+    return DensityTex.SampleLevel(linearClampSampler, xyz, 0);
 }
 
 float3 calculateNormal(int3 pos) {
     // Calculate the gradient of the density field at the given position
     // Using central difference to approximate the gradient
 
-    float dx = SampleDensityFromTexture(pos + coordOffsets[1]) - SampleDensityFromTexture(pos - coordOffsets[1]);
-    float dy = SampleDensityFromTexture(pos + coordOffsets[3]) - SampleDensityFromTexture(pos - coordOffsets[3]);
-    float dz = SampleDensityFromTexture(pos + coordOffsets[4]) - SampleDensityFromTexture(pos - coordOffsets[4]);
+    int3 offsetX = int3(1, 0, 0);
+    int3 offsetY = int3(0, 1, 0);
+    int3 offsetZ = int3(0, 0, 1);
+
+    float dx = SampleDensityFromTexture(pos + offsetX) - SampleDensityFromTexture(pos - offsetX);
+    float dy = SampleDensityFromTexture(pos + offsetY) - SampleDensityFromTexture(pos - offsetY);
+    float dz = SampleDensityFromTexture(pos + offsetZ) - SampleDensityFromTexture(pos - offsetZ);
 
     return normalize(float3(dx, dy, dz));
 }
@@ -54,9 +58,7 @@ Vertex InterpolateVertex(int3 coordA, int3 coordB) {
 
     // Interpolate position based on iso value
     float t = (IsoValue - d1) / (d2 - d1);
-    
-    Vertex v; // interpolated vertex where mesh intersects
-    v.position = lerp(v1Pos, v2Pos, t) * localScale; // scale to world space
+    float3 interpolatedPos = v1Pos + t * (v2Pos - v1Pos);
 
     /*
     Wiki: The gradient of the scalar field at each grid point is also the normal vector 
@@ -66,7 +68,14 @@ Vertex InterpolateVertex(int3 coordA, int3 coordB) {
 
     tldr: interpolate normal on v1 v2
     */
-    v.normal = normalize(calculateNormal(coordA) * (1 - t) + calculateNormal(coordB) * t);
+
+    float3 normalA = calculateNormal(coordA);
+    float3 normalB = calculateNormal(coordB);
+    float3 interpolatedNormal = normalize(normalA * (1.0 - t) + normalB * t);
+
+    Vertex v; // interpolated vertex where mesh intersects
+    v.position = interpolatedPos * localScale; // scale the position to world space
+    v.normal = interpolatedNormal;
     return v;
 }
 
@@ -83,12 +92,12 @@ void MarchCube(int3 id : SV_DispatchThreadID) {
         return; // edges no cube
     }
     
-
+    int3 coord = id;
     int3 cubeCornerCoords[8];
     float coordDensities[8];
     for (int i = 0; i<8; i++)
     {
-        cubeCornerCoords[i] = id + coordOffsets[i];
+        cubeCornerCoords[i] = coord + coordOffsets[i];
         coordDensities[i] = SampleDensityFromTexture(cubeCornerCoords[i]);
     }
 
@@ -104,7 +113,7 @@ void MarchCube(int3 id : SV_DispatchThreadID) {
     int offset = offsetLUT[cubeConfigurationIndex];
     // look into edgeLUT to get the edges that each triangle intersects
 
-    for (int k = 0; k<numTrianglesEdge; k+=3) {
+    for (int k = 0; k<numTrianglesEdge; k += 3) {
         // For each triangle in the cube configuration, interpolate the vertices
         int2 edgeA = vertexIndexFromEdge[edgeLUT[offset + k]];
         int2 edgeB = vertexIndexFromEdge[edgeLUT[offset + k + 1]];
@@ -114,9 +123,9 @@ void MarchCube(int3 id : SV_DispatchThreadID) {
         Vertex vC = InterpolateVertex(cubeCornerCoords[edgeC.x], cubeCornerCoords[edgeC.y]);
 
         Triangle tri;
-        tri.vertexA = vA;
+        tri.vertexA = vC;
         tri.vertexB = vB;
-        tri.vertexC = vC;
+        tri.vertexC = vA;
         OutputBuffer.Append(tri);
     }
 }

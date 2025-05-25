@@ -19,13 +19,13 @@ Shader "Custom/MarchingCubeMesh" {
                 float3 normal;
             };
             
-            struct Triangle {
+            /*struct Triangle {
                 Vertex vertexA;
                 Vertex vertexB; 
                 Vertex vertexC;
-            };
+            };*/
             
-            StructuredBuffer<Triangle> VertexBuffer; // Changed to Triangle buffer
+            StructuredBuffer<Vertex> VertexBuffer; // Changed to Triangle buffer
             float4 _Color; // Color property from the shader
             
             struct appdata
@@ -35,30 +35,22 @@ Shader "Custom/MarchingCubeMesh" {
 
             struct v2f
             {
-                float4 pos : SV_POSITION;
+                float4 vertex : SV_POSITION;
                 float3 normal : TEXCOORD0;
             };
 
             v2f vert(appdata v)
             {
                 v2f o;
-                uint triangleIndex = v.vertexID / 3;
-                uint vertexIndex = v.vertexID % 3;
+                Vertex vertexCur = VertexBuffer[v.vertexID];
                 
-                Triangle tri = VertexBuffer[triangleIndex];
-                Vertex vertex;
-                
-                if (vertexIndex == 0) vertex = tri.vertexA;
-                else if (vertexIndex == 1) vertex = tri.vertexB;
-                else vertex = tri.vertexC;
-                
-                o.pos = UnityObjectToClipPos(float4(vertex.pos, 1.0));
-                o.normal = vertex.normal; 
+                o.vertex = UnityObjectToClipPos(float4(vertexCur.pos, 1.0));
+                o.normal = vertexCur.normal; 
                 return o;
             }
 
             // https://docs.unity3d.com/cn/2021.1/Manual/SL-ShaderSemantics.html
-            fixed4 frag(v2f i) : SV_Target
+            float4 frag(v2f i) : SV_Target
             {
                 // diffuse: interpolated normal i.normal
                 return _Color * (dot(normalize(i.normal), _WorldSpaceLightPos0) * 0.5 + 0.5); 
@@ -66,5 +58,4 @@ Shader "Custom/MarchingCubeMesh" {
             ENDCG
         } 
     }
-    FallBack "Diffuse"
 }

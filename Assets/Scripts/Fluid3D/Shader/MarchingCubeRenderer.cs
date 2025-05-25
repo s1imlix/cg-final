@@ -37,7 +37,7 @@ public class MarchingCubeRenderer : MonoBehaviour
     ComputeBuffer triangleBuffer;
     ComputeBuffer triCountBuffer;
 
-    private Bounds bounds = new Bounds(Vector3.zero, Vector3.one * 100f);
+    private Bounds bounds = new Bounds(Vector3.zero, Vector3.one * 10000f);
     private const int MarchCube = 0;
     private const int UpdateRenderArgs = 1; 
     const uint maxBytes = 2147483648; // 2GB
@@ -112,11 +112,13 @@ public class MarchingCubeRenderer : MonoBehaviour
         
         // Debug.Log($"Any funny corner: {ComputeHelper.DebugStructBuffer<uint>(triCountBuffer, 1)[0]}");
         
-        Triangle[] triangles = ComputeHelper.DebugStructBuffer<Triangle>(triangleBuffer, 10);
-        for (int i = 0; i < 10; i++)
+        /*
+        Triangle[] triangles = ComputeHelper.DebugStructBuffer<Triangle>(triangleBuffer, 40);
+        for (int i = 10; i < 30; i++)
         {
             Debug.Log($"Triangle {i}: A({triangles[i].vertexA.position}), B({triangles[i].vertexB.position}), C({triangles[i].vertexC.position})");
         }
+        */
         
         
         Graphics.DrawProceduralIndirect(marchingCubeMaterial, bounds, MeshTopology.Triangles, renderArgs);
