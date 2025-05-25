@@ -5,10 +5,15 @@ static const int lengthLUT[256] = {0, 3, 3, 6, 3, 6, 6, 9, 3, 6, 6, 9, 6, 9, 9, 
 // e.g. for cube config 1, there is one mesh, intersecting LUT[0+0], LUT[0+1], LUT[0+2]
 
 static const int3 coordOffsets[8] = {
-	int3(0, 0, 0), int3(1, 0, 0), int3(0, 1, 0), int3(0, 0, 1),
-	int3(1, 1, 0), int3(1, 0, 1), int3(0, 1, 1), int3(1, 1, 1)
+    int3(0, 0, 0), 
+    int3(1, 0, 0), 
+    int3(1, 1, 0),  
+    int3(0, 1, 0), 
+    int3(0, 0, 1), 
+    int3(1, 0, 1), 
+    int3(1, 1, 1), 
+    int3(0, 1, 1)  
 };
-
 struct Vertex {
 	float3 position;
 	float3 normal;
