@@ -18,7 +18,7 @@ RWStructuredBuffer<int> RenderArgs; // Buffer to store render arguments, e.g., n
 
 float3 TextureCoordToPos(uint3 coord) { 
     // TextureCoord [x, y, z] to normalized [-0.5, 0.5] range
-    return (coord / (DensityTexSize - 1)) - 0.5f;
+    return ((float3)coord / (float3)(DensityTexSize - 1) - 0.5f);
 }
 
 float SampleDensityFromTexture(int3 pos) {
