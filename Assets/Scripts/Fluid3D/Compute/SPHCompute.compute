@@ -42,7 +42,7 @@ const float4x4 worldToLocal;
 static const uint NumThreads = 64; 
 const float mass = 1.0;
 const float radius = 1.0; 
-const float squaredRadius;
+const float squaredRadius =1.0; // radius * radius
 const float targetDensity = 1000.0; 
 const float pressureMultiplier = 1; 
 const float ngbPressureMultiplier = 1; 

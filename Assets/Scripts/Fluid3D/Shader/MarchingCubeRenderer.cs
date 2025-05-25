@@ -111,13 +111,13 @@ public class MarchingCubeRenderer : MonoBehaviour
         marchingCubeComputeShader.Dispatch(UpdateRenderArgs, 1, 1, 1);
         
         // Debug.Log($"Any funny corner: {ComputeHelper.DebugStructBuffer<uint>(triCountBuffer, 1)[0]}");
-        /*
+        
         Triangle[] triangles = ComputeHelper.DebugStructBuffer<Triangle>(triangleBuffer, 10);
         for (int i = 0; i < 10; i++)
         {
             Debug.Log($"Triangle {i}: A({triangles[i].vertexA.position}), B({triangles[i].vertexB.position}), C({triangles[i].vertexC.position})");
         }
-        */
+        
         
         Graphics.DrawProceduralIndirect(marchingCubeMaterial, bounds, MeshTopology.Triangles, renderArgs);
     }

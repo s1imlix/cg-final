@@ -23,18 +23,18 @@ float3 TextureCoordToPos(uint3 coord) {
 
 
 
-float SampleDensityFromTexture(uint3 pos) {
-    if (any(pos <= 0 || pos >= DensityTexSize - 1)) {
+float SampleDensityFromTexture(int3 pos) {
+    if (any(pos < 0 || pos > (int3)DensityTexSize - 1)) {
         return IsoValue; // must be painted
     }
 
-    float3 xyz = pos / (float3)(DensityTexSize - 1);
+    float3 xyz = (float3)pos / (float3)(DensityTexSize - 1);
     // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-samplelevel
     // SampleLevel(tex, sampler, coord: float3)
     return DensityTex.SampleLevel(LinearClamp, xyz, 0);
 }
 
-float3 calculateNormal(uint3 pos) {
+float3 calculateNormal(int3 pos) {
     // Calculate the gradient of the density field at the given position
     // Using central difference to approximate the gradient
 
