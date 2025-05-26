@@ -44,7 +44,9 @@ Shader "Custom/MarchingCubeMesh" {
                 v2f o;
                 Vertex vertexCur = VertexBuffer[v.vertexID];
                 
-                o.vertex = UnityObjectToClipPos(float4(vertexCur.pos, 1.0));
+                float3 worldPos = vertexCur.pos * float3(4, 1.5, 4);
+                //o.vertex = UnityObjectToClipPos(float4(vertexCur.pos, 1.0));
+                o.vertex = UnityObjectToClipPos(float4(worldPos, 1.0));
                 o.normal = vertexCur.normal; 
                 return o;
             }
