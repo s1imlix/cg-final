@@ -44,7 +44,7 @@ float3 calculateNormal(int3 pos) {
     float dy = SampleDensityFromTexture(pos + offsetY) - SampleDensityFromTexture(pos - offsetY);
     float dz = SampleDensityFromTexture(pos + offsetZ) - SampleDensityFromTexture(pos - offsetZ);
 
-    return normalize(float3(-dx, -dy, -dz));
+    return normalize(float3(dx, dy, dz));
 }
 
 Vertex InterpolateVertex(int3 coordA, int3 coordB) { 
@@ -106,7 +106,7 @@ void MarchCube(int3 id : SV_DispatchThreadID) {
     // Calculate the index of the cube in the lookup table
     int cubeConfigurationIndex = 0;
     for (int j = 0; j < 8; j++) {
-        if (coordDensities[j] < IsoValue) {
+        if (coordDensities[j] > IsoValue) {
             cubeConfigurationIndex |= (1 << j); // set the bit if density is below iso value
         }
     }
