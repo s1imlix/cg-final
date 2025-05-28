@@ -102,7 +102,7 @@ public class MarchingCubeRenderer : MonoBehaviour
         int numX = sphSystem.DensityTexture.width - 1;
         int numY = sphSystem.DensityTexture.height - 1;
         int numZ = sphSystem.DensityTexture.volumeDepth - 1;
-        ComputeHelper.Dispatch(marchingCubeComputeShader, 1,1,1, MarchCube);
+        ComputeHelper.Dispatch(marchingCubeComputeShader, numX, numY, numZ, MarchCube);
         // Debug.Log($"MarchingCubeRenderer: Dispatched {numX}x{numY}x{numZ} cubes.");
         // Debug.Log($"processed {ComputeHelper.DebugStructBuffer<uint>(triCountBuffer, 1)[0]} triangles.");
 
