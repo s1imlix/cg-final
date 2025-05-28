@@ -27,6 +27,7 @@ Shader "Custom/MarchingCubeMesh" {
             
             StructuredBuffer<Vertex> VertexBuffer; // Changed to Triangle buffer
             float4 _Color; // Color property from the shader
+            float3 _Localscale;
             
             struct appdata
             {
@@ -44,8 +45,8 @@ Shader "Custom/MarchingCubeMesh" {
                 v2f o;
                 Vertex vertexCur = VertexBuffer[v.vertexID];
                 
-                float3 worldPos = vertexCur.pos * float3(4, 1.5, 4);
-                //o.vertex = UnityObjectToClipPos(float4(vertexCur.pos, 1.0));
+                float3 worldPos = vertexCur.pos * _Localscale;
+                // o.vertex = UnityObjectToClipPos(float4(vertexCur.pos, 1.0));
                 o.vertex = UnityObjectToClipPos(float4(worldPos, 1.0));
                 o.normal = vertexCur.normal; 
                 return o;

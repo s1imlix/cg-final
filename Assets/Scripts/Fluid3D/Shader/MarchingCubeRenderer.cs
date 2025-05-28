@@ -41,7 +41,7 @@ public class MarchingCubeRenderer : MonoBehaviour
     private const int MarchCube = 0;
     private const int UpdateRenderArgs = 1; 
     const uint maxBytes = 2147483648; // 2GB
-    uint[] zero = new uint[] {0,0,0,0,0,0,0,0};
+    uint[] zero = new uint[] {0,0,0,0,0,0,0,0,0};
 
     public void Init(SPH sph)
     {
@@ -99,10 +99,11 @@ public class MarchingCubeRenderer : MonoBehaviour
         // Launch marching cube compute shader
         UpdateMarchingCubeSettings();
         marchingCubeMaterial.SetBuffer("VertexBuffer", triangleBuffer);
+        marchingCubeMaterial.SetVector("_Localscale", sphSystem.transform.localScale);
         int numX = sphSystem.DensityTexture.width - 1;
         int numY = sphSystem.DensityTexture.height - 1;
         int numZ = sphSystem.DensityTexture.volumeDepth - 1;
-        ComputeHelper.Dispatch(marchingCubeComputeShader, 1,1,1, MarchCube);
+        ComputeHelper.Dispatch(marchingCubeComputeShader, numX, numY, numZ, MarchCube);
         // Debug.Log($"MarchingCubeRenderer: Dispatched {numX}x{numY}x{numZ} cubes.");
         // Debug.Log($"processed {ComputeHelper.DebugStructBuffer<uint>(triCountBuffer, 1)[0]} triangles.");
 
@@ -110,20 +111,22 @@ public class MarchingCubeRenderer : MonoBehaviour
         ComputeBuffer.CopyCount(triangleBuffer, renderArgs, 0);
         marchingCubeComputeShader.Dispatch(UpdateRenderArgs, 1, 1, 1);
         
-        uint[] triCount = ComputeHelper.DebugStructBuffer<uint>(triCountBuffer, 8);
-        for (int i = 0; i < triCount.Length; i++)
+        /*
+        uint[] triCount = ComputeHelper.DebugStructBuffer<uint>(triCountBuffer, 9);
+        for (int i = 0; i < triCount.Length-1; i++)
         {
             Debug.Log($"Density at point {i}: {triCount[i]}");
         }
+        */
+        // Debug.Log($"Total trigon count: {triCount[triCount.Length-1]}");
         
         /*
-        Triangle[] triangles = ComputeHelper.DebugStructBuffer<Triangle>(triangleBuffer, 40);
-        for (int i = 10; i < 30; i++)
+        Triangle[] triangles = ComputeHelper.DebugStructBuffer<Triangle>(triangleBuffer, 2);
+        for (int i = 0; i < 2; i++)
         {
             Debug.Log($"Triangle {i}: A({triangles[i].vertexA.position}), B({triangles[i].vertexB.position}), C({triangles[i].vertexC.position})");
         }
         */
-        
         
         Graphics.DrawProceduralIndirect(marchingCubeMaterial, bounds, MeshTopology.Triangles, renderArgs);
     }
