@@ -5,14 +5,14 @@
 
 Texture3D<float> DensityTex;
 RWStructuredBuffer<int> edgeLUT;
-// RWStructuredBuffer<int> TriCount;
+RWStructuredBuffer<int> TriCount;
 AppendStructuredBuffer<Triangle> OutputBuffer; // Assuming you have a structured buffer to store the output vertices
 const uint3 DensityTexSize;
 const float3 localScale; // scale of the volume in world space
 
 const float IsoValue;
 
-SamplerState linearClampSampler;
+SamplerState LinearClampSampler;
 
 RWStructuredBuffer<int> RenderArgs; // Buffer to store render arguments, e.g., number of triangles
 
@@ -29,7 +29,7 @@ float SampleDensityFromTexture(uint3 pos) {
     float3 xyz = pos / (float3) (DensityTexSize - 1);
     // https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-to-samplelevel
     // SampleLevel(tex, sampler, coord: float3)
-    return DensityTex.SampleLevel(linearClampSampler, xyz, 0);
+    return DensityTex.SampleLevel(LinearClampSampler, xyz, 0);
 }
 
 float3 calculateNormal(int3 pos) {
@@ -99,6 +99,7 @@ void MarchCube(int3 id : SV_DispatchThreadID) {
     {
         cubeCornerCoords[i] = coord + coordOffsets[i];
         coordDensities[i] = SampleDensityFromTexture(cubeCornerCoords[i]);
+        TriCount[i] = coordDensities[i];
     }
 
     // Calculate the index of the cube in the lookup table

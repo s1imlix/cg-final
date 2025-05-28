@@ -41,7 +41,7 @@ public class MarchingCubeRenderer : MonoBehaviour
     private const int MarchCube = 0;
     private const int UpdateRenderArgs = 1; 
     const uint maxBytes = 2147483648; // 2GB
-    uint[] zero = new uint[] {0};
+    uint[] zero = new uint[] {0,0,0,0,0,0,0,0};
 
     public void Init(SPH sph)
     {
@@ -62,7 +62,7 @@ public class MarchingCubeRenderer : MonoBehaviour
 
     void LateUpdate()
     {
-        if (!isRendering || sphSystem.DensityTexture == null) return;
+        if (!isRendering || sphSystem.DensityTexture == null || sphSystem.isPaused) return;
         RenderFluid();
     }
 
@@ -102,7 +102,7 @@ public class MarchingCubeRenderer : MonoBehaviour
         int numX = sphSystem.DensityTexture.width - 1;
         int numY = sphSystem.DensityTexture.height - 1;
         int numZ = sphSystem.DensityTexture.volumeDepth - 1;
-        ComputeHelper.Dispatch(marchingCubeComputeShader, numX, numY, numZ, MarchCube);
+        ComputeHelper.Dispatch(marchingCubeComputeShader, 1,1,1, MarchCube);
         // Debug.Log($"MarchingCubeRenderer: Dispatched {numX}x{numY}x{numZ} cubes.");
         // Debug.Log($"processed {ComputeHelper.DebugStructBuffer<uint>(triCountBuffer, 1)[0]} triangles.");
 
@@ -110,7 +110,11 @@ public class MarchingCubeRenderer : MonoBehaviour
         ComputeBuffer.CopyCount(triangleBuffer, renderArgs, 0);
         marchingCubeComputeShader.Dispatch(UpdateRenderArgs, 1, 1, 1);
         
-        // Debug.Log($"Any funny corner: {ComputeHelper.DebugStructBuffer<uint>(triCountBuffer, 1)[0]}");
+        uint[] triCount = ComputeHelper.DebugStructBuffer<uint>(triCountBuffer, 8);
+        for (int i = 0; i < triCount.Length; i++)
+        {
+            Debug.Log($"Density at point {i}: {triCount[i]}");
+        }
         
         /*
         Triangle[] triangles = ComputeHelper.DebugStructBuffer<Triangle>(triangleBuffer, 40);

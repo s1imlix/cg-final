@@ -36,7 +36,9 @@ public class SPH : MonoBehaviour
 
     [Header("Simulation settings")]
     public bool pauseNextFrame = false;
-    private bool isPaused;
+    
+    [HideInInspector]
+    public bool isPaused;
     public bool showBoundingBox;
     public int iterationPerFrame;
     public float timeScale;
@@ -185,7 +187,7 @@ public class SPH : MonoBehaviour
             Simulate();
             // onSimulationComplete?.Invoke();
         }
-        if (marchingCubeRenderer.isRendering) UpdateDensityTexture();
+        if (marchingCubeRenderer.isRendering && !isPaused) UpdateDensityTexture();
     }
 
     void UpdateSettings(float timeStep) {
