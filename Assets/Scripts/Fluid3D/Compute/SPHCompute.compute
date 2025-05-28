@@ -274,7 +274,7 @@ void calcDensityTexture(uint3 id : SV_DispatchThreadID) {
     if (id.x >= DensityTexSize.x ||
         id.y >= DensityTexSize.y ||
         id.z >= DensityTexSize.z) return;
-    float3 texPos = id / (DensityTexSize - 1); // component-wise division
+    float3 texPos = id / (float3)(DensityTexSize - 1); // component-wise division
     float3 worldPos = (texPos - 0.5) * 2.0 * halfBoxScale; // scale to world space
     DensityTex[id] = calcDensityAtPos(worldPos);
     // debugDensityBuffer[0] = calcDensityAtPos(worldPos); // For debugging, can be removed later 

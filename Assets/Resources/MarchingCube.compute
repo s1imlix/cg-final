@@ -44,7 +44,7 @@ float3 calculateNormal(int3 pos) {
     float dy = SampleDensityFromTexture(pos + offsetY) - SampleDensityFromTexture(pos - offsetY);
     float dz = SampleDensityFromTexture(pos + offsetZ) - SampleDensityFromTexture(pos - offsetZ);
 
-    return normalize(float3(dx, dy, dz));
+    return normalize(float3(-dx, -dy, -dz));
 }
 
 Vertex InterpolateVertex(int3 coordA, int3 coordB) { 
@@ -58,6 +58,7 @@ Vertex InterpolateVertex(int3 coordA, int3 coordB) {
 
     // Interpolate position based on iso value
     float t = (IsoValue - d1) / (d2 - d1);
+    t = 0.5; 
     float3 interpolatedPos = v1Pos + t * (v2Pos - v1Pos);
 
     /*
