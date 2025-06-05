@@ -108,10 +108,6 @@ In essence, the flow of our Marching Cube can be described as follow:
 
 
 
-
-
-
-
 #### `MarchingCubeRenderer.cs`
 This file implements the rendering component of the SPH simulation using the Marching Cubes algorithm to generate a triangle mesh from a 3D scalar density field.
 It also define vertex (position and normal) and triangle structs (3 vertices) for GPU output.
