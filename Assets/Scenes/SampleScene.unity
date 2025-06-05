@@ -150,18 +150,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7da0ff73bd2cc9c998612982aabff1e7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  MAX_PARTICLES: 30000
-  pauseNextFrame: 1
+  MAX_PARTICLES: 9000
+  pauseNextFrame: 0
+  isPaused: 0
   showBoundingBox: 0
   iterationPerFrame: 1
   timeScale: 0.1
   gravity: {x: 0, y: -9.8, z: 0}
-  targetDensity: 80
+  targetDensity: 50
   pressureMultiplier: 20
   ngbPressureMultiplier: 5
   particleMass: 5
-  particleRadius: 0.4
-  viscosityStrength: 0.09
+  particleRadius: 2
+  viscosityStrength: 0.00001
   collisionDamping: 0.1
   numToSpawn: {x: 10000, y: 100, z: 100}
   spawnBasePosition: {x: 0, y: 0, z: 0}
@@ -255,7 +256,7 @@ MonoBehaviour:
   isRendering: 1
   debugTriCount: 1
   Resolution: 50
-  isoLevel: 25
+  isoLevel: 20
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0

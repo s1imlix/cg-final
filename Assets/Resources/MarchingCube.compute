@@ -58,7 +58,6 @@ Vertex InterpolateVertex(int3 coordA, int3 coordB) {
 
     // Interpolate position based on iso value
     float t = (IsoValue - d1) / (d2 - d1);
-    t = 0.5; 
     float3 interpolatedPos = v1Pos + t * (v2Pos - v1Pos);
 
     /*
